@@ -50,6 +50,7 @@ class CommunityService {
           commentsCount: p['comments_count'] ?? 0,
           isLikedByMe: likedIds.contains(p['id']),
           emotion: p['emotion'],
+          category: p['category'],
           createdAt: DateTime.parse(p['created_at']),
         );
       }).toList();
@@ -99,6 +100,7 @@ class CommunityService {
         likesCount: 0,
         commentsCount: 0,
         emotion: data['emotion'],
+        category: data['category'],
         createdAt: DateTime.parse(data['created_at']),
       );
     } catch (e) {
@@ -367,6 +369,7 @@ class CommunityService {
           commentsCount: p['comments_count'] ?? 0,
           isLikedByMe: likedIds.contains(p['id']),
           emotion: p['emotion'],
+          category: p['category'],
           createdAt: DateTime.parse(p['created_at']),
         );
       }).toList();

@@ -175,9 +175,13 @@ class _CommunityProfileScreenState extends State<CommunityProfileScreen> {
             Row(
               children: [
                 Text(_timeAgo(post.createdAt), style: TextStyle(fontSize: 12, color: SentioColors.textTertiary)),
-                if (emotion != null && emotion.isNotEmpty) ...[
+                if (emotion != null && emotion.isNotEmpty && post.emotion != null) ...[
                   const SizedBox(width: 6),
-                  Text(emotion['emoji'] ?? '', style: const TextStyle(fontSize: 14)),
+                  Icon(
+                    SentioConstants.getEmotionIcon(post.emotion!),
+                    size: 14,
+                    color: Color(emotion['color'] as int),
+                  ),
                 ],
               ],
             ),

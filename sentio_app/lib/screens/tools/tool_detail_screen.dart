@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,14 +33,10 @@ class _BreathingConfig {
 
   int durationOf(BreathPhase phase) {
     switch (phase) {
-      case BreathPhase.inhale:
-        return inhale;
-      case BreathPhase.holdIn:
-        return holdIn;
-      case BreathPhase.exhale:
-        return exhale;
-      case BreathPhase.holdOut:
-        return holdOut;
+      case BreathPhase.inhale: return inhale;
+      case BreathPhase.holdIn: return holdIn;
+      case BreathPhase.exhale: return exhale;
+      case BreathPhase.holdOut: return holdOut;
     }
   }
 
@@ -50,9 +47,9 @@ class _BreathingConfig {
       case BreathPhase.holdIn:
         return BreathPhase.exhale;
       case BreathPhase.exhale:
-        return holdOut > 0 ? BreathPhase.holdOut : null; // null = cycle end
+        return holdOut > 0 ? BreathPhase.holdOut : null;
       case BreathPhase.holdOut:
-        return null; // cycle end
+        return null;
     }
   }
 }
@@ -86,13 +83,14 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
   int _currentCycle = 1;
   Timer? _phaseTimer;
 
-  // Breathing circle animation
+  // Animations
   late AnimationController _circleController;
   late Animation<double> _circleSize;
-
-  // Glow pulse animation
   late AnimationController _glowController;
-  late Animation<double> _glowOpacity;
+  late AnimationController _bgController;
+  late AnimationController _entryController;
+  late Animation<double> _entryFade;
+  late Animation<Offset> _entrySlide;
 
   @override
   void initState() {
@@ -103,7 +101,6 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
     );
     _remainingSeconds = _tool['durationSeconds'] as int;
 
-    // Parse breathing config
     if (_isBreathing && _tool['breathingPattern'] != null) {
       final p = _tool['breathingPattern'] as Map<String, dynamic>;
       _breathConfig = _BreathingConfig(
@@ -119,17 +116,31 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
       duration: const Duration(seconds: 4),
       vsync: this,
     );
-    _circleSize = Tween(begin: 100.0, end: 220.0).animate(
-      CurvedAnimation(parent: _circleController, curve: Curves.easeInOut),
+    _circleSize = Tween(begin: 120.0, end: 280.0).animate(
+      CurvedAnimation(parent: _circleController, curve: Curves.easeInOutCubic),
     );
 
     _glowController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     )..repeat(reverse: true);
-    _glowOpacity = Tween(begin: 0.3, end: 0.7).animate(
-      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
+
+    _bgController = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _entryController = AnimationController(
+      duration: const Duration(milliseconds: 700),
+      vsync: this,
     );
+    _entryFade = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _entryController, curve: Curves.easeOut),
+    );
+    _entrySlide = Tween(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _entryController, curve: Curves.easeOutCubic),
+    );
+    _entryController.forward();
   }
 
   @override
@@ -138,13 +149,36 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
     _phaseTimer?.cancel();
     _circleController.dispose();
     _glowController.dispose();
+    _bgController.dispose();
+    _entryController.dispose();
     super.dispose();
   }
 
-  // ── Start ──
+  Color get _toolColor {
+    switch (_tool['category'] as String) {
+      case 'breathing': return SentioColors.accent;
+      case 'pause': return SentioColors.primary;
+      case 'anxiety': return const Color(0xFF9B8EC4);
+      case 'entrepreneur': return SentioColors.warning;
+      default: return SentioColors.primary;
+    }
+  }
+
+  IconData get _toolIcon {
+    switch (_tool['category'] as String) {
+      case 'breathing': return Icons.air_rounded;
+      case 'pause': return Icons.pause_circle_outline_rounded;
+      case 'anxiety': return Icons.self_improvement_rounded;
+      case 'entrepreneur': return Icons.rocket_launch_outlined;
+      default: return Icons.spa_outlined;
+    }
+  }
 
   void _start() {
+    HapticFeedback.lightImpact();
     setState(() => _started = true);
+    _entryController.reset();
+    _entryController.forward();
     _startGlobalTimer();
     if (_isBreathing && _breathConfig != null) {
       _startBreathingPhase(BreathPhase.inhale);
@@ -161,8 +195,6 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
     });
   }
 
-  // ── Breathing phase machine ──
-
   void _startBreathingPhase(BreathPhase phase) {
     final config = _breathConfig!;
     final duration = config.durationOf(phase);
@@ -174,7 +206,6 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
 
     HapticFeedback.lightImpact();
 
-    // Animate circle based on phase
     _circleController.stop();
     _circleController.duration = Duration(seconds: duration);
 
@@ -183,13 +214,13 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
         _circleController.forward(from: 0.0);
         break;
       case BreathPhase.holdIn:
-        _circleController.value = 1.0; // keep expanded
+        _circleController.value = 1.0;
         break;
       case BreathPhase.exhale:
         _circleController.reverse(from: 1.0);
         break;
       case BreathPhase.holdOut:
-        _circleController.value = 0.0; // keep contracted
+        _circleController.value = 0.0;
         break;
     }
 
@@ -213,7 +244,6 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
     if (next != null) {
       _startBreathingPhase(next);
     } else {
-      // Cycle complete
       if (_currentCycle >= config.totalCycles) {
         _complete();
       } else {
@@ -223,16 +253,15 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
     }
   }
 
-  // ── Complete ──
-
   void _complete() {
     _timer?.cancel();
     _phaseTimer?.cancel();
     _circleController.stop();
-    HapticFeedback.mediumImpact();
+    HapticFeedback.heavyImpact();
     setState(() => _completed = true);
+    _entryController.reset();
+    _entryController.forward();
 
-    // Save tool usage + award XP
     final provider = context.read<AppProvider>();
     provider.saveToolUsage(
       toolId: _tool['id'],
@@ -244,14 +273,10 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
 
   String _phaseLabel(BreathPhase phase) {
     switch (phase) {
-      case BreathPhase.inhale:
-        return 'Inhala';
-      case BreathPhase.holdIn:
-        return 'Mantené';
-      case BreathPhase.exhale:
-        return 'Exhala';
-      case BreathPhase.holdOut:
-        return 'Pausa';
+      case BreathPhase.inhale: return 'Inhalá';
+      case BreathPhase.holdIn: return 'Mantené';
+      case BreathPhase.exhale: return 'Exhalá';
+      case BreathPhase.holdOut: return 'Pausa';
     }
   }
 
@@ -261,8 +286,6 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
     return '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
   }
 
-  // ── Build ──
-
   @override
   Widget build(BuildContext context) {
     if (_completed) return _buildCompletedView();
@@ -270,299 +293,49 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
     return _buildStartView();
   }
 
-  // ── Start view ──
+  // ══════════════════════════════════════
+  // ANIMATED BACKGROUND (shared)
+  // ══════════════════════════════════════
 
-  Widget _buildStartView() {
-    final color = _isBreathing ? SentioColors.accent : SentioColors.primary;
-
-    return Scaffold(
-      backgroundColor: SentioColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: const Icon(Icons.arrow_back_rounded),
-                  ),
-                ],
-              ),
-              const Spacer(flex: 2),
-              // Icon
-              Container(
-                width: 100,
-                height: 100,
+  Widget _animatedBackground(Color color) {
+    return AnimatedBuilder(
+      animation: _bgController,
+      builder: (context, _) {
+        final t = _bgController.value;
+        return Stack(
+          children: [
+            Positioned(
+              right: -100 + t * 60,
+              top: -50 + t * 40,
+              child: Container(
+                width: 320,
+                height: 320,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: color.withValues(alpha: 0.12),
-                ),
-                child: Icon(
-                  _isBreathing ? Icons.air_rounded : Icons.self_improvement_rounded,
-                  color: color,
-                  size: 48,
-                ),
-              ),
-              const SizedBox(height: 32),
-              Text(
-                _tool['title'],
-                style: GoogleFonts.manrope(
-                  fontSize: 28,
-                  color: SentioColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _tool['description'],
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: SentioColors.textSecondary,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              if (_isBreathing && _breathConfig != null) ...[
-                const SizedBox(height: 16),
-                _buildPatternChips(),
-              ],
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _tool['duration'],
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: color),
-                ),
-              ),
-              const Spacer(flex: 3),
-              ElevatedButton(
-                onPressed: _start,
-                style: ElevatedButton.styleFrom(backgroundColor: color),
-                child: const Text('Empezar'),
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPatternChips() {
-    final config = _breathConfig!;
-    final phases = <MapEntry<String, int>>[
-      MapEntry('Inhala', config.inhale),
-      if (config.holdIn > 0) MapEntry('Mantené', config.holdIn),
-      MapEntry('Exhala', config.exhale),
-      if (config.holdOut > 0) MapEntry('Pausa', config.holdOut),
-    ];
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: phases.map((e) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: SentioColors.accent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${e.key} ${e.value}s',
-              style: GoogleFonts.manrope(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: SentioColors.accent,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // ── Active view ──
-
-  Widget _buildActiveView() {
-    final color = _isBreathing ? SentioColors.accent : SentioColors.primary;
-    final totalSeconds = _tool['durationSeconds'] as int;
-    final progress = 1 - (_remainingSeconds / totalSeconds);
-
-    return Scaffold(
-      backgroundColor: SentioColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      _timer?.cancel();
-                      _phaseTimer?.cancel();
-                      _circleController.stop();
-                      context.pop();
-                    },
-                    child: const Icon(Icons.close_rounded, color: SentioColors.textTertiary),
-                  ),
-                  Text(
-                    _formatTime(_remainingSeconds),
-                    style: GoogleFonts.manrope(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: SentioColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              const Spacer(flex: 2),
-              // Breathing circle or non-breathing content
-              if (_isBreathing && _breathConfig != null)
-                _buildBreathingCircle(color)
-              else ...[
-                Container(
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: color.withValues(alpha: 0.08),
-                  ),
-                  child: Icon(Icons.self_improvement_rounded, color: color, size: 64),
-                ),
-                const SizedBox(height: 32),
-                Text(
-                  _tool['description'],
-                  style: GoogleFonts.manrope(
-                    fontSize: 22,
-                    color: SentioColors.textPrimary,
-                    height: 1.4,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-              const Spacer(flex: 3),
-              // Progress bar
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: color.withValues(alpha: 0.1),
-                  valueColor: AlwaysStoppedAnimation(color),
-                  minHeight: 4,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: _complete,
-                child: Text(
-                  'Terminar antes',
-                  style: TextStyle(color: SentioColors.textTertiary),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBreathingCircle(Color color) {
-    final config = _breathConfig!;
-
-    return AnimatedBuilder(
-      animation: Listenable.merge([_circleSize, _glowOpacity]),
-      builder: (_, __) {
-        final size = _circleSize.value;
-        final glow = _glowOpacity.value;
-
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Cycle counter
-            Text(
-              'Ciclo ${_currentCycle}/${config.totalCycles}',
-              style: GoogleFonts.manrope(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: SentioColors.textTertiary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Animated circle with glow
-            Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    color.withValues(alpha: 0.15),
-                    color.withValues(alpha: 0.05),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.7, 1.0],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: glow),
-                    blurRadius: 40,
-                    spreadRadius: 10,
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Container(
-                  width: size * 0.35,
-                  height: size * 0.35,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: color.withValues(alpha: 0.25),
-                    border: Border.all(
-                      color: color.withValues(alpha: 0.5),
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: glow * 0.5),
-                        blurRadius: 20,
-                      ),
+                  gradient: RadialGradient(
+                    colors: [
+                      color.withValues(alpha: 0.12 + t * 0.06),
+                      color.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 32),
-            // Phase label with animated switch
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: Text(
-                _phaseLabel(_currentPhase),
-                key: ValueKey(_currentPhase),
-                style: GoogleFonts.manrope(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: color,
+            Positioned(
+              left: -80 + t * 30,
+              bottom: 100 + t * 50,
+              child: Container(
+                width: 250,
+                height: 250,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      color.withValues(alpha: 0.08 + t * 0.04),
+                      color.withValues(alpha: 0.0),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Phase countdown
-            Text(
-              '$_phaseSecondsLeft',
-              style: GoogleFonts.manrope(
-                fontSize: 48,
-                fontWeight: FontWeight.w800,
-                color: SentioColors.textPrimary,
-                letterSpacing: -1,
               ),
             ),
           ],
@@ -571,80 +344,942 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
     );
   }
 
-  // ── Completed view ──
+  // ══════════════════════════════════════
+  // START VIEW (premium intro)
+  // ══════════════════════════════════════
 
-  Widget _buildCompletedView() {
+  Widget _buildStartView() {
+    final color = _toolColor;
+
     return Scaffold(
       backgroundColor: SentioColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(flex: 2),
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: SentioColors.accent.withValues(alpha: 0.15),
-                  boxShadow: SentioEffects.glow(SentioColors.accent, blur: 20, opacity: 0.4),
-                ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: SentioColors.accent,
-                  size: 48,
-                ),
-              ),
-              const SizedBox(height: 32),
-              Text(
-                'Bien hecho',
-                style: GoogleFonts.manrope(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: SentioColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Cada pausa cuenta.\nTu cuerpo y tu mente te lo agradecen.',
-                style: GoogleFonts.manrope(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: SentioColors.textSecondary,
-                  height: 1.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              // XP earned badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: SentioColors.accent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: SentioColors.accent.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  '+${XpRewards.toolCompleted} XP',
-                  style: GoogleFonts.manrope(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: SentioColors.accent,
+      body: Stack(
+        children: [
+          _animatedBackground(color),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  // Header with back button
+                  Row(
+                    children: [
+                      _SpringTap(
+                        onTap: () => context.pop(),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: SentioColors.border),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_rounded,
+                            color: SentioColors.textPrimary,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: color.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.timer_outlined, size: 13, color: color),
+                            const SizedBox(width: 5),
+                            Text(
+                              _tool['duration'],
+                              style: GoogleFonts.manrope(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: color,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+
+                  // Content
+                  Expanded(
+                    child: SlideTransition(
+                      position: _entrySlide,
+                      child: FadeTransition(
+                        opacity: _entryFade,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Animated icon with glow
+                            AnimatedBuilder(
+                              animation: _glowController,
+                              builder: (context, _) {
+                                final glow = _glowController.value;
+                                return Container(
+                                  width: 140,
+                                  height: 140,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(
+                                      colors: [
+                                        color.withValues(alpha: 0.25),
+                                        color.withValues(alpha: 0.08),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.0, 0.6, 1.0],
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: color.withValues(alpha: 0.2 + glow * 0.2),
+                                        blurRadius: 40 + glow * 20,
+                                        spreadRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Container(
+                                      width: 80,
+                                      height: 80,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            color.withValues(alpha: 0.3),
+                                            color.withValues(alpha: 0.1),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        border: Border.all(
+                                          color: color.withValues(alpha: 0.4),
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      child: Icon(_toolIcon, color: color, size: 38),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 36),
+                            Text(
+                              _tool['title'],
+                              style: GoogleFonts.manrope(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800,
+                                color: SentioColors.textPrimary,
+                                letterSpacing: -1,
+                                height: 1.1,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 14),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              child: Text(
+                                _tool['description'],
+                                style: GoogleFonts.manrope(
+                                  fontSize: 15,
+                                  color: SentioColors.textSecondary,
+                                  height: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            if (_isBreathing && _breathConfig != null) ...[
+                              const SizedBox(height: 28),
+                              _buildPatternChips(color),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Big start button with glow
+                  AnimatedBuilder(
+                    animation: _glowController,
+                    builder: (context, _) {
+                      final glow = _glowController.value;
+                      return _SpringTap(
+                        onTap: _start,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [color, color.withValues(alpha: 0.7)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withValues(alpha: 0.3 + glow * 0.2),
+                                blurRadius: 24 + glow * 8,
+                                spreadRadius: -2,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Empezar',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
-              const Spacer(flex: 3),
-              ElevatedButton(
-                onPressed: () => context.pop(),
-                child: const Text('Volver'),
-              ),
-              const SizedBox(height: 24),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
+
+  Widget _buildPatternChips(Color color) {
+    final config = _breathConfig!;
+    final phases = <MapEntry<String, int>>[
+      MapEntry('Inhalá', config.inhale),
+      if (config.holdIn > 0) MapEntry('Mantené', config.holdIn),
+      MapEntry('Exhalá', config.exhale),
+      if (config.holdOut > 0) MapEntry('Pausa', config.holdOut),
+    ];
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.center,
+      children: phases.map((e) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.15)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                e.key,
+                style: GoogleFonts.manrope(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: SentioColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${e.value}s',
+                  style: GoogleFonts.manrope(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // ══════════════════════════════════════
+  // ACTIVE VIEW (premium during practice)
+  // ══════════════════════════════════════
+
+  Widget _buildActiveView() {
+    final color = _toolColor;
+    final totalSeconds = _tool['durationSeconds'] as int;
+    final progress = 1 - (_remainingSeconds / totalSeconds);
+
+    return Scaffold(
+      backgroundColor: SentioColors.background,
+      body: Stack(
+        children: [
+          _animatedBackground(color),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _SpringTap(
+                        onTap: () {
+                          _timer?.cancel();
+                          _phaseTimer?.cancel();
+                          _circleController.stop();
+                          context.pop();
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: SentioColors.border),
+                          ),
+                          child: const Icon(Icons.close_rounded, color: SentioColors.textPrimary, size: 18),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: SentioColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.timer_outlined, size: 14, color: color),
+                            const SizedBox(width: 6),
+                            Text(
+                              _formatTime(_remainingSeconds),
+                              style: GoogleFonts.manrope(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: SentioColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Main content
+                  Expanded(
+                    child: Center(
+                      child: _isBreathing && _breathConfig != null
+                          ? _buildBreathingCircle(color)
+                          : _buildNonBreathingActive(color),
+                    ),
+                  ),
+
+                  // Premium progress bar
+                  Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.0, end: progress),
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOut,
+                        builder: (context, value, _) {
+                          return LinearProgressIndicator(
+                            value: value,
+                            backgroundColor: Colors.transparent,
+                            valueColor: AlwaysStoppedAnimation(color),
+                            minHeight: 6,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton.icon(
+                    onPressed: _complete,
+                    icon: Icon(Icons.check_rounded, size: 16, color: SentioColors.textTertiary),
+                    label: Text(
+                      'Terminar antes',
+                      style: GoogleFonts.manrope(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: SentioColors.textTertiary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNonBreathingActive(Color color) {
+    return AnimatedBuilder(
+      animation: _glowController,
+      builder: (context, _) {
+        final glow = _glowController.value;
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    color.withValues(alpha: 0.2),
+                    color.withValues(alpha: 0.05),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.6, 1.0],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.15 + glow * 0.15),
+                    blurRadius: 50 + glow * 20,
+                    spreadRadius: 10,
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        color.withValues(alpha: 0.3),
+                        color.withValues(alpha: 0.12),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
+                  ),
+                  child: Icon(_toolIcon, color: color, size: 56),
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                _tool['description'],
+                style: GoogleFonts.manrope(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w600,
+                  color: SentioColors.textPrimary,
+                  height: 1.5,
+                  letterSpacing: -0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildBreathingCircle(Color color) {
+    final config = _breathConfig!;
+
+    return AnimatedBuilder(
+      animation: Listenable.merge([_circleSize, _glowController]),
+      builder: (_, __) {
+        final size = _circleSize.value;
+        final glow = _glowController.value;
+
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Cycle indicator (premium)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: SentioColors.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Ciclo ',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      color: SentioColors.textTertiary,
+                    ),
+                  ),
+                  Text(
+                    '$_currentCycle',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
+                  Text(
+                    ' / ${config.totalCycles}',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      color: SentioColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 36),
+            // Layered breathing circle with concentric rings
+            SizedBox(
+              width: 320,
+              height: 320,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Outer ring (decorative)
+                  Container(
+                    width: 320,
+                    height: 320,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.06),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 260,
+                    height: 260,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.08),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  // Animated breathing circle with glow
+                  Container(
+                    width: size,
+                    height: size,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          color.withValues(alpha: 0.3),
+                          color.withValues(alpha: 0.1),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.7, 1.0],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.25 + glow * 0.2),
+                          blurRadius: 50,
+                          spreadRadius: 10,
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Inner solid circle
+                  Container(
+                    width: size * 0.45,
+                    height: size * 0.45,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          color.withValues(alpha: 0.5),
+                          color.withValues(alpha: 0.2),
+                        ],
+                      ),
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.6),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.3 + glow * 0.2),
+                          blurRadius: 30,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Phase label + countdown overlay
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 400),
+                        transitionBuilder: (child, animation) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: ScaleTransition(scale: animation, child: child),
+                          );
+                        },
+                        child: Text(
+                          _phaseLabel(_currentPhase),
+                          key: ValueKey(_currentPhase),
+                          style: GoogleFonts.manrope(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        transitionBuilder: (child, animation) {
+                          return ScaleTransition(scale: animation, child: child);
+                        },
+                        child: Text(
+                          '$_phaseSecondsLeft',
+                          key: ValueKey(_phaseSecondsLeft),
+                          style: GoogleFonts.manrope(
+                            fontSize: 56,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -2,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ══════════════════════════════════════
+  // COMPLETED VIEW (premium celebration)
+  // ══════════════════════════════════════
+
+  Widget _buildCompletedView() {
+    final color = _toolColor;
+    return Scaffold(
+      backgroundColor: SentioColors.background,
+      body: Stack(
+        children: [
+          _animatedBackground(SentioColors.accent),
+          // Confetti effect (custom paint)
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _entryController,
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: _ConfettiPainter(_entryController.value),
+                );
+              },
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  const Spacer(flex: 2),
+                  SlideTransition(
+                    position: _entrySlide,
+                    child: FadeTransition(
+                      opacity: _entryFade,
+                      child: Column(
+                        children: [
+                          // Success icon with strong glow
+                          AnimatedBuilder(
+                            animation: _glowController,
+                            builder: (context, _) {
+                              final glow = _glowController.value;
+                              return Container(
+                                width: 130,
+                                height: 130,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(
+                                    colors: [
+                                      SentioColors.accent.withValues(alpha: 0.4),
+                                      SentioColors.accent.withValues(alpha: 0.1),
+                                      Colors.transparent,
+                                    ],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: SentioColors.accent.withValues(alpha: 0.4 + glow * 0.2),
+                                      blurRadius: 50 + glow * 20,
+                                      spreadRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    width: 76,
+                                    height: 76,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: const LinearGradient(
+                                        colors: [SentioColors.accent, Color(0xFF00D4AA)],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.check_rounded,
+                                      color: Colors.black,
+                                      size: 44,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 36),
+                          Text(
+                            'Bien hecho',
+                            style: GoogleFonts.manrope(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                              color: SentioColors.textPrimary,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Text(
+                              'Cada pausa cuenta.\nTu cuerpo y tu mente te lo agradecen.',
+                              style: GoogleFonts.manrope(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w400,
+                                color: SentioColors.textSecondary,
+                                height: 1.6,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          // XP earned badge with glow
+                          AnimatedBuilder(
+                            animation: _glowController,
+                            builder: (context, _) {
+                              final glow = _glowController.value;
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      SentioColors.accent.withValues(alpha: 0.2),
+                                      SentioColors.accent.withValues(alpha: 0.08),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(28),
+                                  border: Border.all(
+                                    color: SentioColors.accent.withValues(alpha: 0.4 + glow * 0.2),
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: SentioColors.accent.withValues(alpha: 0.15 + glow * 0.15),
+                                      blurRadius: 16 + glow * 8,
+                                      spreadRadius: -2,
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.bolt_rounded, color: SentioColors.accent, size: 20),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '+${XpRewards.toolCompleted} XP',
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: SentioColors.accent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(flex: 3),
+                  _SpringTap(
+                    onTap: () => context.pop(),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [color, color.withValues(alpha: 0.7)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            spreadRadius: -2,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Volver',
+                          style: GoogleFonts.manrope(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════
+// SPRING TAP BUTTON
+// ══════════════════════════════════════
+
+class _SpringTap extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  const _SpringTap({required this.child, required this.onTap});
+
+  @override
+  State<_SpringTap> createState() => _SpringTapState();
+}
+
+class _SpringTapState extends State<_SpringTap> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 150));
+    _scale = Tween(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _ctrl.forward(),
+      onTapUp: (_) { _ctrl.reverse(); widget.onTap(); },
+      onTapCancel: () => _ctrl.reverse(),
+      child: ScaleTransition(scale: _scale, child: widget.child),
+    );
+  }
+}
+
+// ══════════════════════════════════════
+// CONFETTI PAINTER (one-shot on complete)
+// ══════════════════════════════════════
+
+class _ConfettiPainter extends CustomPainter {
+  final double progress;
+  final List<_ConfettiParticle> particles;
+
+  _ConfettiPainter(this.progress)
+      : particles = List.generate(40, (i) => _ConfettiParticle(i));
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress == 0) return;
+    final colors = [
+      SentioColors.accent,
+      SentioColors.primary,
+      const Color(0xFFFFD93D),
+      const Color(0xFFFF6B9D),
+    ];
+
+    for (final p in particles) {
+      final t = (progress + p.delay).clamp(0.0, 1.0);
+      if (t <= 0) continue;
+      final fall = t * (size.height + 100);
+      final x = p.startX * size.width + math.sin(t * math.pi * 2 + p.startX * 10) * 30;
+      final y = -20 + fall;
+
+      final paint = Paint()
+        ..color = colors[p.colorIdx % colors.length].withValues(alpha: (1 - t).clamp(0.0, 1.0));
+
+      canvas.save();
+      canvas.translate(x, y);
+      canvas.rotate(t * p.rotSpeed * math.pi * 2);
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset.zero, width: 6, height: 8),
+        paint,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConfettiPainter oldDelegate) => oldDelegate.progress != progress;
+}
+
+class _ConfettiParticle {
+  final double startX;
+  final double delay;
+  final double rotSpeed;
+  final int colorIdx;
+
+  _ConfettiParticle(int seed)
+      : startX = (seed * 37 % 100) / 100,
+        delay = -((seed * 13 % 30) / 100),
+        rotSpeed = 1.0 + (seed % 5) * 0.3,
+        colorIdx = seed;
 }

@@ -279,9 +279,20 @@ class _ReceiptScanScreenState extends State<ReceiptScanScreen> {
                     border: Border.all(color: isSelected ? color : SentioColors.divider),
                   ),
                   child: Center(
-                    child: Text('${cat['emoji']} ${cat['label']}',
-                      style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w500,
-                        color: isSelected ? color : SentioColors.textSecondary)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          cat['icon'] as IconData,
+                          size: 14,
+                          color: isSelected ? color : SentioColors.textSecondary,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(cat['label'] as String,
+                          style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w500,
+                            color: isSelected ? color : SentioColors.textSecondary)),
+                      ],
+                    ),
                   ),
                 ),
               );

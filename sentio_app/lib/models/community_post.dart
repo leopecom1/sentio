@@ -9,6 +9,7 @@ class CommunityPost {
   final int commentsCount;
   final bool isLikedByMe;
   final String? emotion;
+  final String? category;
   final DateTime createdAt;
 
   CommunityPost({
@@ -22,6 +23,7 @@ class CommunityPost {
     this.commentsCount = 0,
     this.isLikedByMe = false,
     this.emotion,
+    this.category,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -37,6 +39,7 @@ class CommunityPost {
       commentsCount: json['comments_count'] ?? 0,
       isLikedByMe: json['is_liked_by_me'] ?? false,
       emotion: json['emotion'],
+      category: json['category'],
       createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
     );
   }
@@ -57,6 +60,7 @@ class CommunityPost {
       commentsCount: commentsCount ?? this.commentsCount,
       isLikedByMe: isLikedByMe ?? this.isLikedByMe,
       emotion: emotion,
+      category: category,
       createdAt: createdAt,
     );
   }

@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -55,8 +56,8 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
           children: [
-            // Total Balance Card
-            _buildBalanceCard(totalBalance, monthlyIncome, monthlyExpenses),
+            // Total Balance Card (per currency)
+            _buildBalanceCard(provider),
             const SizedBox(height: 20),
 
             // Quick Actions
@@ -96,42 +97,131 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
     );
   }
 
-  Widget _buildBalanceCard(double total, double income, double expenses) {
+  Widget _buildBalanceCard(AppProvider provider) {
+    final balances = provider.balanceByCurrency;
+    final incomes = provider.monthlyIncomeByCurrency;
+    final expenses = provider.monthlyExpensesByCurrency;
+
+    // Aggregate all currencies present (balance + income + expenses)
+    final allCurrencies = <String>{
+      ...balances.keys,
+      ...incomes.keys,
+      ...expenses.keys,
+    }.toList();
+
+    if (allCurrencies.isEmpty) {
+      // No accounts yet — show placeholder
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: SentioEffects.glowCard(glowColor: SentioColors.accent),
+        child: Column(
+          children: [
+            Text('Balance total',
+              style: GoogleFonts.manrope(fontSize: 13, color: SentioColors.textSecondary, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 8),
+            Text(
+              'Sin cuentas',
+              style: GoogleFonts.manrope(
+                fontSize: 24, fontWeight: FontWeight.w700, color: SentioColors.textTertiary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text('Creá una cuenta para empezar',
+              style: GoogleFonts.manrope(fontSize: 13, color: SentioColors.textSecondary)),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: SentioEffects.glowCard(glowColor: SentioColors.accent),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('Balance total',
+            textAlign: TextAlign.center,
             style: GoogleFonts.manrope(fontSize: 13, color: SentioColors.textSecondary, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          Text(
-            FinanceConstants.formatAmount(total, 'ARS'),
-            style: GoogleFonts.manrope(
-              fontSize: 32, fontWeight: FontWeight.w800, color: SentioColors.textPrimary, letterSpacing: -1,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(child: _buildMiniStat('Ingresos', income, const Color(0xFF4CAF50))),
-              Container(width: 1, height: 36, color: SentioColors.divider),
-              Expanded(child: _buildMiniStat('Gastos', expenses, SentioColors.error)),
-            ],
-          ),
+          const SizedBox(height: 14),
+          // Per-currency rows
+          ...allCurrencies.map((currency) {
+            final bal = balances[currency] ?? 0;
+            final inc = incomes[currency] ?? 0;
+            final exp = expenses[currency] ?? 0;
+            return _buildCurrencyBlock(currency, bal, inc, exp);
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildMiniStat(String label, double amount, Color color) {
+  Widget _buildCurrencyBlock(String currency, double balance, double income, double expenses) {
+    final symbol = FinanceConstants.currencySymbol(currency);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: SentioColors.border),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: SentioColors.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  currency,
+                  style: GoogleFonts.manrope(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: SentioColors.accent,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              Text(
+                FinanceConstants.formatAmount(balance, currency),
+                style: GoogleFonts.manrope(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: SentioColors.textPrimary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+          if (income > 0 || expenses > 0) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _buildMiniStat('Ingresos', income, currency, const Color(0xFF4CAF50))),
+                Container(width: 1, height: 28, color: SentioColors.divider),
+                Expanded(child: _buildMiniStat('Gastos', expenses, currency, SentioColors.error)),
+              ],
+            ),
+          ],
+          // hide unused symbol var warning in builds
+          if (symbol.isEmpty) const SizedBox.shrink(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStat(String label, double amount, String currency, Color color) {
     return Column(
       children: [
-        Text(label, style: GoogleFonts.manrope(fontSize: 12, color: SentioColors.textSecondary)),
-        const SizedBox(height: 4),
+        Text(label, style: GoogleFonts.manrope(fontSize: 11, color: SentioColors.textSecondary)),
+        const SizedBox(height: 2),
         Text(
-          FinanceConstants.formatAmount(amount, 'ARS'),
-          style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w700, color: color),
+          FinanceConstants.formatAmount(amount, currency),
+          style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w700, color: color),
         ),
       ],
     );
@@ -297,8 +387,14 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
+                      Icon(
+                        FinanceConstants.getCategoryIcon(entry.key),
+                        size: 14,
+                        color: Color(cat?['color'] as int? ?? 0xFF9E9E9E),
+                      ),
+                      const SizedBox(width: 6),
                       Expanded(
-                        child: Text('${cat?['emoji'] ?? ''} ${cat?['label'] ?? entry.key}',
+                        child: Text(cat?['label'] ?? entry.key,
                           style: GoogleFonts.manrope(fontSize: 12, color: SentioColors.textPrimary),
                           overflow: TextOverflow.ellipsis),
                       ),
@@ -360,53 +456,189 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
   }
 
   Widget _buildTransactionTile(FinancialTransaction tx) {
-    final cat = FinanceConstants.getCategoryById(tx.category);
     final isIncome = tx.isIncome;
+    final provider = context.read<AppProvider>();
+    // Use the account's currency (fallback to tx.currency)
+    final account = provider.financialAccounts
+        .where((a) => a.id == tx.accountId)
+        .firstOrNull;
+    final displayCurrency = account?.currency ?? tx.currency;
 
+    // Look up category in defaults first, then in user's custom categories
+    final defaultCat = FinanceConstants.getCategoryById(tx.category);
+    final customCat = defaultCat == null
+        ? provider.customCategories.where((c) => c.id == tx.category).firstOrNull
+        : null;
+    final catLabel = defaultCat?['label'] ?? customCat?.label ?? tx.category;
+    final catColor = defaultCat != null
+        ? Color(defaultCat['color'] as int)
+        : (customCat != null ? Color(customCat.color) : const Color(0xFF9E9E9E));
+    final catIcon = defaultCat != null
+        ? FinanceConstants.getCategoryIcon(tx.category)
+        : (customCat?.iconData ?? Icons.more_horiz_rounded);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Dismissible(
+        key: ValueKey(tx.id),
+        background: _swipeBackground(
+          color: SentioColors.primary,
+          icon: Icons.edit_rounded,
+          label: 'Editar',
+          alignment: Alignment.centerLeft,
+        ),
+        secondaryBackground: _swipeBackground(
+          color: SentioColors.error,
+          icon: Icons.delete_rounded,
+          label: 'Eliminar',
+          alignment: Alignment.centerRight,
+        ),
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.startToEnd) {
+            // Swipe right: edit (don't actually dismiss)
+            HapticFeedback.lightImpact();
+            context.push('/finance/add?id=${tx.id}');
+            return false;
+          } else {
+            // Swipe left: confirm delete
+            HapticFeedback.mediumImpact();
+            return await _confirmDelete(tx);
+          }
+        },
+        onDismissed: (_) async {
+          final provider = context.read<AppProvider>();
+          final ok = await provider.deleteFinancialTransaction(tx.id);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                ok ? 'Movimiento eliminado' : 'No se pudo eliminar',
+                style: GoogleFonts.manrope(),
+              ),
+              backgroundColor: ok ? SentioColors.surface : SentioColors.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: SentioEffects.standardCard(),
+          child: Row(
+            children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: catColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(catIcon, size: 20, color: catColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tx.description ?? catLabel,
+                      style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w600, color: SentioColors.textPrimary),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${tx.transactionDate.day}/${tx.transactionDate.month}',
+                      style: GoogleFonts.manrope(fontSize: 12, color: SentioColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '${isIncome ? '+' : '-'} ${FinanceConstants.formatAmount(tx.amount, displayCurrency)}',
+                style: GoogleFonts.manrope(
+                  fontSize: 14, fontWeight: FontWeight.w700,
+                  color: isIncome ? const Color(0xFF4CAF50) : SentioColors.error,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _swipeBackground({
+    required Color color,
+    required IconData icon,
+    required String label,
+    required Alignment alignment,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: SentioEffects.standardCard(),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      alignment: alignment,
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: Color(cat?['color'] as int? ?? 0xFF9E9E9E).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(cat?['emoji'] ?? '📌', style: const TextStyle(fontSize: 18)),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tx.description ?? (cat?['label'] ?? tx.category),
-                  style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w600, color: SentioColors.textPrimary),
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${tx.transactionDate.day}/${tx.transactionDate.month}',
-                  style: GoogleFonts.manrope(fontSize: 12, color: SentioColors.textSecondary),
-                ),
-              ],
-            ),
-          ),
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 8),
           Text(
-            '${isIncome ? '+' : '-'} ${FinanceConstants.formatAmount(tx.amount, tx.currency)}',
+            label,
             style: GoogleFonts.manrope(
-              fontSize: 14, fontWeight: FontWeight.w700,
-              color: isIncome ? const Color(0xFF4CAF50) : SentioColors.error,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: color,
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<bool> _confirmDelete(FinancialTransaction tx) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SentioColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          '¿Eliminar movimiento?',
+          style: GoogleFonts.manrope(
+            fontWeight: FontWeight.w800,
+            color: SentioColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Esta acción no se puede deshacer.',
+          style: GoogleFonts.manrope(
+            fontSize: 14,
+            color: SentioColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.manrope(color: SentioColors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Eliminar',
+              style: GoogleFonts.manrope(
+                color: SentioColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   Widget _buildEmptyState() {

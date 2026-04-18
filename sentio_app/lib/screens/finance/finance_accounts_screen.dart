@@ -180,47 +180,58 @@ class FinanceAccountsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Currency + Balance row
-              Row(
-                children: [
-                  // Currency toggle
-                  ...FinanceConstants.currencies.map((c) {
+              // Currency selector (scrollable horizontal)
+              Text('Moneda', style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w600, color: SentioColors.textSecondary)),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 36,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: FinanceConstants.currencies.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    final c = FinanceConstants.currencies[i];
                     final isSelected = selectedCurrency == c['id'];
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: GestureDetector(
-                        onTap: () => setSheetState(() => selectedCurrency = c['id']!),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isSelected ? SentioColors.primary.withValues(alpha: 0.15) : SentioColors.background,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: isSelected ? SentioColors.primary : SentioColors.divider),
-                          ),
-                          child: Text(c['id']!,
-                            style: GoogleFonts.manrope(
-                              fontSize: 13, fontWeight: FontWeight.w600,
-                              color: isSelected ? SentioColors.primary : SentioColors.textSecondary)),
+                    return GestureDetector(
+                      onTap: () => setSheetState(() => selectedCurrency = c['id']!),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected ? SentioColors.primary.withValues(alpha: 0.15) : SentioColors.background,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: isSelected ? SentioColors.primary : SentioColors.divider),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(c['symbol']!,
+                              style: GoogleFonts.manrope(
+                                fontSize: 11, fontWeight: FontWeight.w800,
+                                color: isSelected ? SentioColors.primary : SentioColors.textTertiary)),
+                            const SizedBox(width: 4),
+                            Text(c['id']!,
+                              style: GoogleFonts.manrope(
+                                fontSize: 13, fontWeight: FontWeight.w600,
+                                color: isSelected ? SentioColors.primary : SentioColors.textSecondary)),
+                          ],
                         ),
                       ),
                     );
-                  }),
-                  const SizedBox(width: 8),
-                  // Balance input
-                  Expanded(
-                    child: TextField(
-                      controller: balanceController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: GoogleFonts.manrope(color: SentioColors.textPrimary),
-                      decoration: InputDecoration(
-                        hintText: 'Balance inicial',
-                        hintStyle: GoogleFonts.manrope(color: SentioColors.textSecondary),
-                        prefixText: '${FinanceConstants.currencySymbol(selectedCurrency)} ',
-                        prefixStyle: GoogleFonts.manrope(color: SentioColors.textSecondary),
-                      ),
-                    ),
-                  ),
-                ],
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Balance input
+              TextField(
+                controller: balanceController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: GoogleFonts.manrope(color: SentioColors.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Balance inicial',
+                  hintStyle: GoogleFonts.manrope(color: SentioColors.textSecondary),
+                  prefixText: '${FinanceConstants.currencySymbol(selectedCurrency)} ',
+                  prefixStyle: GoogleFonts.manrope(color: SentioColors.textSecondary, fontWeight: FontWeight.w700),
+                ),
               ),
               const SizedBox(height: 24),
 

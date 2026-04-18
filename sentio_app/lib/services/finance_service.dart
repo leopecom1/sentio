@@ -7,6 +7,7 @@ import 'package:sentio_app/config/constants.dart';
 import 'package:sentio_app/config/finance_constants.dart';
 import 'package:sentio_app/models/financial_account.dart';
 import 'package:sentio_app/models/financial_transaction.dart';
+import 'package:sentio_app/models/custom_category.dart';
 
 class FinanceService {
   FinanceService._();
@@ -166,6 +167,92 @@ class FinanceService {
       return true;
     } catch (e) {
       debugPrint('Error deleting transaction: $e');
+      return false;
+    }
+  }
+
+  // ── Custom Categories ──
+
+  Future<List<CustomCategory>> loadCustomCategories() async {
+    if (_userId == null) return [];
+    try {
+      final data = await _supabase
+          .from('custom_categories')
+          .select()
+          .eq('user_id', _userId!)
+          .order('created_at');
+      return (data as List).map((c) => CustomCategory.fromJson(c)).toList();
+    } catch (e) {
+      debugPrint('Error loading custom categories: $e');
+      return [];
+    }
+  }
+
+  Future<CustomCategory?> createCustomCategory({
+    required String type,
+    required String label,
+    required int iconCode,
+    required int color,
+  }) async {
+    if (_userId == null) return null;
+    try {
+      final data = await _supabase
+          .from('custom_categories')
+          .insert({
+            'user_id': _userId,
+            'type': type,
+            'label': label,
+            'icon_code': iconCode,
+            'color': color,
+          })
+          .select()
+          .single();
+      return CustomCategory.fromJson(data);
+    } catch (e) {
+      debugPrint('Error creating custom category: $e');
+      return null;
+    }
+  }
+
+  Future<bool> deleteCustomCategory(String id) async {
+    try {
+      await _supabase.from('custom_categories').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting custom category: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateTransaction({
+    required String transactionId,
+    String? type,
+    double? amount,
+    String? category,
+    String? description,
+    String? accountId,
+    DateTime? transactionDate,
+  }) async {
+    try {
+      final updates = <String, dynamic>{
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (type != null) updates['type'] = type;
+      if (amount != null) updates['amount'] = amount;
+      if (category != null) updates['category'] = category;
+      if (description != null) updates['description'] = description;
+      if (accountId != null) updates['account_id'] = accountId;
+      if (transactionDate != null) {
+        updates['transaction_date'] = transactionDate.toIso8601String();
+      }
+
+      await _supabase
+          .from('financial_transactions')
+          .update(updates)
+          .eq('id', transactionId);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating transaction: $e');
       return false;
     }
   }

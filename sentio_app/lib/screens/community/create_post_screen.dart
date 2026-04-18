@@ -15,6 +15,7 @@ class CreatePostScreen extends StatefulWidget {
 class _CreatePostScreenState extends State<CreatePostScreen> {
   final _controller = TextEditingController();
   String? _selectedEmotion;
+  String _selectedCategory = 'Mentalidad';
 
   @override
   void dispose() {
@@ -27,7 +28,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (text.isEmpty) return;
 
     final provider = context.read<AppProvider>();
-    await provider.createCommunityPost(text, emotion: _selectedEmotion);
+    await provider.createCommunityPost(
+      text,
+      emotion: _selectedEmotion,
+      category: _selectedCategory.toLowerCase(),
+    );
     // Reload so the feed shows the new post
     provider.loadCommunityData();
     if (mounted) context.go('/community');
@@ -85,6 +90,43 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 onChanged: (_) => setState(() {}),
               ),
             ),
+            // Category selector
+            const Text('Categoría', style: TextStyle(fontSize: 13, color: SentioColors.textSecondary)),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 36,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: SentioConstants.communityCategories.length - 1, // skip 'Todo'
+                itemBuilder: (context, index) {
+                  final cat = SentioConstants.communityCategories[index + 1];
+                  final isSelected = _selectedCategory == cat;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedCategory = cat),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? SentioColors.primary : SentioColors.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected ? SentioColors.primary : SentioColors.divider,
+                        ),
+                      ),
+                      child: Text(
+                        cat,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? Colors.white : SentioColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
             // Emotion selector
             const Text('¿Cómo te sentís?', style: TextStyle(fontSize: 13, color: SentioColors.textSecondary)),
             const SizedBox(height: 8),
@@ -110,12 +152,23 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                           color: isSelected ? Color(emotion['color']) : SentioColors.divider,
                         ),
                       ),
-                      child: Text(
-                        '${emotion['emoji']} ${emotion['label']}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isSelected ? Color(emotion['color']) : SentioColors.textSecondary,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            SentioConstants.getEmotionIcon(emotion['id']),
+                            size: 14,
+                            color: isSelected ? Color(emotion['color']) : SentioColors.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            emotion['label'],
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isSelected ? Color(emotion['color']) : SentioColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );

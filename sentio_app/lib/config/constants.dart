@@ -110,6 +110,15 @@ class SentioConstants {
   // Tools
   static const List<Map<String, dynamic>> tools = [
     {
+      'id': 'burnout_test',
+      'title': 'Test de Burnout',
+      'description': 'Evaluá tu nivel de agotamiento profesional en 5 minutos',
+      'category': 'assessment',
+      'duration': '5 min',
+      'durationSeconds': 300,
+      'featured': true,
+    },
+    {
       'id': 'breathing_calm',
       'title': 'Respiración para calmar',
       'description': 'Técnica 4-7-8 para bajar la ansiedad',

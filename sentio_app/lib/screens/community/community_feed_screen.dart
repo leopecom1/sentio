@@ -129,10 +129,13 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     final groupedUserIds = storiesByUser.keys.toList();
     final selectedCategory = provider.selectedCommunityCategory;
 
-    // Filter posts by category
+    // Filter posts by category (compare lowercase for consistency)
     final posts = selectedCategory == 'Todo'
         ? allPosts
-        : allPosts.where((p) => _postCategory(p) == selectedCategory).toList();
+        : allPosts.where((p) {
+            final postCat = p.category ?? _postCategory(p);
+            return (postCat ?? '').toLowerCase() == selectedCategory.toLowerCase();
+          }).toList();
 
     return Scaffold(
       backgroundColor: SentioColors.background,
@@ -642,10 +645,14 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                 ),
                               ),
                             ],
-                            // Emotion emoji
-                            if (emotion != null && emotion.isNotEmpty) ...[
+                            // Emotion icon
+                            if (emotion != null && emotion.isNotEmpty && post.emotion != null) ...[
                               const SizedBox(width: 6),
-                              Text(emotion['emoji'] ?? '', style: const TextStyle(fontSize: 13)),
+                              Icon(
+                                SentioConstants.getEmotionIcon(post.emotion!),
+                                size: 13,
+                                color: Color(emotion['color'] as int),
+                              ),
                             ],
                           ],
                         ),

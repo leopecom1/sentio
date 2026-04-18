@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:sentio_app/config/theme.dart';
 import 'package:sentio_app/providers/app_provider.dart';
@@ -15,6 +17,101 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   int _selectedEvolutionTab = 0;
+  bool _uploadingAvatar = false;
+
+  Future<void> _pickAndUploadAvatar(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    HapticFeedback.lightImpact();
+    setState(() => _uploadingAvatar = true);
+
+    try {
+      final bytes = await picked.readAsBytes();
+      final url = await context.read<AppProvider>().uploadAvatar(bytes);
+      if (!mounted) return;
+      if (url != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Foto actualizada'),
+            backgroundColor: SentioColors.accent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('No se pudo subir la foto. Reintentá.'),
+            backgroundColor: SentioColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: SentioColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
+  void _showAvatarSourceSheet() {
+    HapticFeedback.selectionClick();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: SentioColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: SentioColors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded, color: SentioColors.textPrimary),
+                title: Text('Tomar foto', style: GoogleFonts.manrope(color: SentioColors.textPrimary)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadAvatar(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: SentioColors.textPrimary),
+                title: Text('Elegir de galería', style: GoogleFonts.manrope(color: SentioColors.textPrimary)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadAvatar(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   IconData _mapIconName(String iconName) {
     switch (iconName) {
@@ -178,23 +275,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () {},
                   ),
                   _MenuItemData(
-                    icon: Icons.lock_outline_rounded,
-                    label: 'Privacidad',
-                    onTap: () {},
+                    icon: Icons.shield_outlined,
+                    label: 'Política de privacidad',
+                    onTap: () => context.push('/legal/privacy'),
+                  ),
+                  _MenuItemData(
+                    icon: Icons.gavel_rounded,
+                    label: 'Términos y condiciones',
+                    onTap: () => context.push('/legal/terms'),
                   ),
                 ],
               ),
 
               const SizedBox(height: 16),
 
+              // ─── B2BETTER BANNER ───
+              _B2BetterBanner(),
+
+              const SizedBox(height: 16),
+
               _buildMenuSection(
                 title: 'Acerca de',
                 items: [
-                  _MenuItemData(
-                    icon: Icons.info_outline_rounded,
-                    label: 'Sobre Sentio',
-                    onTap: () {},
-                  ),
                   _MenuItemData(
                     icon: Icons.help_outline_rounded,
                     label: 'Ayuda',
@@ -237,7 +339,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Sentio v1.0.0',
+                      'B2Better v1.0.0',
                       style: GoogleFonts.manrope(
                         fontSize: 12,
                         color: SentioColors.textSecondary,
@@ -384,21 +486,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 bottom: 0,
                 right: 0,
                 child: GestureDetector(
-                  onTap: () {
-                    // Edit avatar action
-                  },
+                  onTap: _uploadingAvatar ? null : _showAvatarSourceSheet,
                   child: Container(
                     width: 32,
                     height: 32,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: SentioColors.primary,
+                      border: Border.all(color: SentioColors.background, width: 2),
                     ),
-                    child: const Icon(
-                      Icons.edit_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
+                    child: _uploadingAvatar
+                        ? const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.camera_alt_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
                   ),
                 ),
               ),
@@ -1132,4 +1241,84 @@ class _MenuItemData {
     this.trailing,
     required this.onTap,
   });
+}
+
+// ══════════════════════════════════════
+// B2BETTER / MATEO SILVERA BANNER
+// ══════════════════════════════════════
+
+class _B2BetterBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push('/about/mateo'),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              SentioColors.primary.withValues(alpha: 0.12),
+              SentioColors.accent.withValues(alpha: 0.08),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: SentioColors.primary.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 48,
+                height: 48,
+                color: Colors.white,
+                padding: const EdgeInsets.all(4),
+                child: Image.asset(
+                  'assets/images/mateo_logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: SentioColors.primary,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sobre B2Better',
+                    style: GoogleFonts.manrope(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: SentioColors.textPrimary,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'La historia detrás de la app',
+                    style: GoogleFonts.manrope(
+                      fontSize: 11,
+                      color: SentioColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 13,
+              color: SentioColors.primary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

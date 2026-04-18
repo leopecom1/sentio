@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -19,6 +20,7 @@ import 'package:sentio_app/services/finance_service.dart';
 import 'package:sentio_app/services/gamification_service.dart';
 import 'package:sentio_app/models/financial_account.dart';
 import 'package:sentio_app/models/financial_transaction.dart';
+import 'package:sentio_app/models/custom_category.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum CelebrationEvent { xpGained, streakMilestone, levelUp, achievementUnlocked }
@@ -66,6 +68,7 @@ class AppProvider extends ChangeNotifier {
   // Finance
   List<FinancialAccount> _financialAccounts = [];
   List<FinancialTransaction> _financialTransactions = [];
+  List<CustomCategory> _customCategories = [];
 
   // Gamification
   int _totalXp = 0;
@@ -99,9 +102,54 @@ class AppProvider extends ChangeNotifier {
   // Finance getters
   List<FinancialAccount> get financialAccounts => _financialAccounts;
   List<FinancialTransaction> get financialTransactions => _financialTransactions;
+  List<CustomCategory> get customCategories => _customCategories;
+  List<CustomCategory> customCategoriesForType(String type) =>
+      _customCategories.where((c) => c.type == type).toList();
 
   double get totalBalance {
     return _financialAccounts.fold(0.0, (sum, a) => sum + a.balance);
+  }
+
+  /// Balance grouped by currency: {'USD': 1234.5, 'ARS': 5000.0, ...}
+  Map<String, double> get balanceByCurrency {
+    final Map<String, double> result = {};
+    for (final a in _financialAccounts) {
+      result[a.currency] = (result[a.currency] ?? 0) + a.balance;
+    }
+    return result;
+  }
+
+  /// Monthly income grouped by currency
+  Map<String, double> get monthlyIncomeByCurrency {
+    final now = DateTime.now();
+    final firstOfMonth = DateTime(now.year, now.month, 1);
+    final Map<String, double> result = {};
+    for (final t in _financialTransactions) {
+      if (!t.isIncome || t.transactionDate.isBefore(firstOfMonth)) continue;
+      final currency = _currencyForTx(t);
+      result[currency] = (result[currency] ?? 0) + t.amount;
+    }
+    return result;
+  }
+
+  /// Monthly expenses grouped by currency
+  Map<String, double> get monthlyExpensesByCurrency {
+    final now = DateTime.now();
+    final firstOfMonth = DateTime(now.year, now.month, 1);
+    final Map<String, double> result = {};
+    for (final t in _financialTransactions) {
+      if (!t.isExpense || t.transactionDate.isBefore(firstOfMonth)) continue;
+      final currency = _currencyForTx(t);
+      result[currency] = (result[currency] ?? 0) + t.amount;
+    }
+    return result;
+  }
+
+  String _currencyForTx(FinancialTransaction t) {
+    final acc = _financialAccounts
+        .where((a) => a.id == t.accountId)
+        .firstOrNull;
+    return acc?.currency ?? t.currency;
   }
 
   double get monthlyExpenses {
@@ -239,10 +287,53 @@ class AppProvider extends ChangeNotifier {
         _celebratedAchievementIds.add(a.id);
       }
     }
-    // Persist celebrated achievements
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setStringList('celebrated_achievements', _celebratedAchievementIds.toList());
-    });
+    // Persist celebrated achievements (scoped per user)
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId != null) {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setStringList('celebrated_achievements_$userId', _celebratedAchievementIds.toList());
+      });
+    }
+  }
+
+  /// Load celebrated achievements for the currently logged-in user
+  Future<void> _loadCelebratedAchievements() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      _celebratedAchievementIds = {};
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    _celebratedAchievementIds = (prefs.getStringList('celebrated_achievements_$userId') ?? []).toSet();
+
+    // Migration: if the user has unlocked achievements but no celebrated record,
+    // mark all currently unlocked ones as already celebrated (avoid re-triggering)
+    if (_celebratedAchievementIds.isEmpty && _profile != null) {
+      final defs = Achievement.definitions;
+      final p = _profile!;
+      final List<String> wouldUnlock = [];
+      for (final d in defs) {
+        bool unlocked = false;
+        switch (d['id']) {
+          case 'first_checkin': unlocked = p.totalCheckins >= 1; break;
+          case 'writer_5': unlocked = p.totalJournalEntries >= 5; break;
+          case 'streak_7': unlocked = p.longestStreak >= 7; break;
+          case 'breather_10': unlocked = p.totalToolsUsed >= 10; break;
+          case 'talker_10': unlocked = p.totalChatMessages >= 50; break;
+          case 'connected': unlocked = _communityPosts.any((post) => post.userId == p.id); break;
+          case 'deep_5': unlocked = _checkins.where((c) => c.isDeep).length >= 5; break;
+          case 'streak_30': unlocked = p.longestStreak >= 30; break;
+          case 'routine_10': unlocked = p.totalToolsUsed >= 20; break;
+          case 'finance_first': unlocked = p.totalTransactions >= 1; break;
+          case 'finance_10': unlocked = p.totalTransactions >= 10; break;
+          case 'receipt_scanner': unlocked = _financialTransactions.where((t) => t.isFromScan).length >= 5; break;
+        }
+        if (unlocked) wouldUnlock.add(d['id']!);
+      }
+      // Pre-mark them so we don't re-celebrate on first login after fix
+      _celebratedAchievementIds = wouldUnlock.toSet();
+      await prefs.setStringList('celebrated_achievements_$userId', _celebratedAchievementIds.toList());
+    }
   }
 
   void setLoading(bool value) {
@@ -252,9 +343,8 @@ class AppProvider extends ChangeNotifier {
 
   // ============ INIT ============
   Future<void> initialize() async {
-    // Load celebrated achievements from local storage
-    final prefs = await SharedPreferences.getInstance();
-    _celebratedAchievementIds = (prefs.getStringList('celebrated_achievements') ?? []).toSet();
+    // Load celebrated achievements for current user (per-user scoped)
+    await _loadCelebratedAchievements();
 
     final session = _supabase.auth.currentSession;
     if (session != null) {
@@ -302,6 +392,8 @@ class AppProvider extends ChangeNotifier {
     ]);
 
     _findTodayCheckin();
+    // Load celebrated achievements BEFORE calculating XP so we don't re-celebrate
+    await _loadCelebratedAchievements();
     _calculateXp();
     notifyListeners();
   }
@@ -433,9 +525,9 @@ class AppProvider extends ChangeNotifier {
     _financialAccounts = [];
     _financialTransactions = [];
     _celebratedAchievementIds = {};
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.remove('celebrated_achievements');
-    });
+    // NOTE: do NOT delete 'celebrated_achievements_*' keys — they are per-user
+    // and should survive sign-out so the user doesn't see celebrations again
+    // when signing back in.
   }
 
   // ============ AUTH ============
@@ -793,6 +885,29 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ============ TOOL USAGE ============
+  Future<void> saveTestResult({
+    required String testType,
+    required String severity,
+    required int severityScore,
+    required Map<String, dynamic> scores,
+    required List<dynamic> answers,
+  }) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      await _supabase.from('test_results').insert({
+        'user_id': userId,
+        'test_type': testType,
+        'severity': severity,
+        'severity_score': severityScore,
+        'scores': scores,
+        'answers': answers,
+      });
+    } catch (e) {
+      debugPrint('Error saving test result: $e');
+    }
+  }
+
   Future<void> saveToolUsage({
     required String toolId,
     required String toolCategory,
@@ -906,6 +1021,7 @@ class AppProvider extends ChangeNotifier {
     bool? morningReminder,
     bool? eveningReminder,
     String? theme,
+    String? avatarUrl,
   }) async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
@@ -920,6 +1036,7 @@ class AppProvider extends ChangeNotifier {
     if (morningReminder != null) updates['morning_reminder'] = morningReminder;
     if (eveningReminder != null) updates['evening_reminder'] = eveningReminder;
     if (theme != null) updates['theme'] = theme;
+    if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
 
     try {
       await _supabase.from('profiles').update(updates).eq('id', userId);
@@ -928,6 +1045,36 @@ class AppProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error updating profile: $e');
       rethrow;
+    }
+  }
+
+  /// Upload avatar image to Supabase storage and update profile
+  Future<String?> uploadAvatar(Uint8List bytes) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return null;
+
+    try {
+      final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final path = '$userId/$fileName';
+
+      await _supabase.storage
+          .from('avatars')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
+          );
+
+      final publicUrl = _supabase.storage.from('avatars').getPublicUrl(path);
+
+      // Add cache-buster so the UI refetches the new image
+      final urlWithBust = '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+
+      await updateProfile(avatarUrl: urlWithBust);
+      return urlWithBust;
+    } catch (e) {
+      debugPrint('Error uploading avatar: $e');
+      return null;
     }
   }
 
@@ -973,6 +1120,7 @@ class AppProvider extends ChangeNotifier {
       await Future.wait([
         _loadFinancialAccounts(),
         _loadFinancialTransactions(),
+        _loadCustomCategories(),
       ]);
     } catch (e) {
       debugPrint('Error loading financial data: $e');
@@ -985,6 +1133,38 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _loadFinancialTransactions() async {
     _financialTransactions = await _financeService.loadTransactions();
+  }
+
+  Future<void> _loadCustomCategories() async {
+    _customCategories = await _financeService.loadCustomCategories();
+  }
+
+  Future<CustomCategory?> createCustomCategory({
+    required String type,
+    required String label,
+    required int iconCode,
+    required int color,
+  }) async {
+    final cat = await _financeService.createCustomCategory(
+      type: type,
+      label: label,
+      iconCode: iconCode,
+      color: color,
+    );
+    if (cat != null) {
+      _customCategories.add(cat);
+      notifyListeners();
+    }
+    return cat;
+  }
+
+  Future<bool> deleteCustomCategory(String id) async {
+    final ok = await _financeService.deleteCustomCategory(id);
+    if (ok) {
+      _customCategories.removeWhere((c) => c.id == id);
+      notifyListeners();
+    }
+    return ok;
   }
 
   Future<void> refreshFinancialData() async {
@@ -1061,6 +1241,31 @@ class AppProvider extends ChangeNotifier {
     if (ok) {
       _financialTransactions.removeWhere((t) => t.id == transactionId);
       await _loadFinancialAccounts();
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  Future<bool> updateFinancialTransaction({
+    required String transactionId,
+    String? type,
+    double? amount,
+    String? category,
+    String? description,
+    String? accountId,
+    DateTime? transactionDate,
+  }) async {
+    final ok = await _financeService.updateTransaction(
+      transactionId: transactionId,
+      type: type,
+      amount: amount,
+      category: category,
+      description: description,
+      accountId: accountId,
+      transactionDate: transactionDate,
+    );
+    if (ok) {
+      await _loadFinancialData();
       notifyListeners();
     }
     return ok;

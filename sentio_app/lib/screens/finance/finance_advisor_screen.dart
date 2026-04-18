@@ -154,7 +154,11 @@ class _FinanceAdvisorScreenState extends State<FinanceAdvisorScreen> with Single
         children: [
           Row(
             children: [
-              Text(cat?['emoji'] as String? ?? '📌', style: const TextStyle(fontSize: 18)),
+              Icon(
+                FinanceConstants.getCategoryIcon(entry.key),
+                size: 18,
+                color: Color(cat?['color'] as int? ?? 0xFF9E9E9E),
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(cat?['label'] as String? ?? entry.key,

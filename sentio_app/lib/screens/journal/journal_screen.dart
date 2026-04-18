@@ -139,10 +139,10 @@ class JournalScreen extends StatelessWidget {
                                               BorderRadius.circular(10),
                                         ),
                                         child: Center(
-                                          child: Text(
-                                            emotion['emoji'],
-                                            style:
-                                                const TextStyle(fontSize: 18),
+                                          child: Icon(
+                                            SentioConstants.getEmotionIcon(emotion['id']),
+                                            color: emotionColor,
+                                            size: 18,
                                           ),
                                         ),
                                       ),

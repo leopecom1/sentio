@@ -10,6 +10,7 @@ import 'package:sentio_app/screens/journal/journal_entry_screen.dart';
 import 'package:sentio_app/screens/chat/chat_screen.dart';
 import 'package:sentio_app/screens/tools/tools_screen.dart';
 import 'package:sentio_app/screens/tools/tool_detail_screen.dart';
+import 'package:sentio_app/screens/tools/burnout_test_screen.dart';
 import 'package:sentio_app/screens/content/article_screen.dart';
 import 'package:sentio_app/screens/profile/profile_screen.dart';
 import 'package:sentio_app/screens/crisis/crisis_screen.dart';
@@ -28,6 +29,9 @@ import 'package:sentio_app/screens/finance/finance_accounts_screen.dart';
 import 'package:sentio_app/screens/finance/add_transaction_screen.dart';
 import 'package:sentio_app/screens/finance/receipt_scan_screen.dart';
 import 'package:sentio_app/screens/finance/finance_advisor_screen.dart';
+import 'package:sentio_app/screens/legal/legal_screen.dart';
+import 'package:sentio_app/screens/about/mateo_about_screen.dart';
+import 'package:sentio_app/screens/materials/materials_screen.dart';
 import 'package:sentio_app/widgets/main_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -98,9 +102,11 @@ GoRouter createRouter(AppProvider appProvider) {
       GoRoute(
         path: '/tool/:id',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => ToolDetailScreen(
-          toolId: state.pathParameters['id']!,
-        ),
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          if (id == 'burnout_test') return const BurnoutTestScreen();
+          return ToolDetailScreen(toolId: id);
+        },
       ),
       // Check-in - full screen
       GoRoute(
@@ -184,6 +190,7 @@ GoRouter createRouter(AppProvider appProvider) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => AddTransactionScreen(
           initialType: state.uri.queryParameters['type'] ?? 'expense',
+          transactionId: state.uri.queryParameters['id'],
         ),
       ),
       GoRoute(
@@ -201,6 +208,26 @@ GoRouter createRouter(AppProvider appProvider) {
         path: '/settings/notifications',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const NotificationSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/legal/terms',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const LegalScreen(type: LegalDocType.terms),
+      ),
+      GoRoute(
+        path: '/legal/privacy',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const LegalScreen(type: LegalDocType.privacy),
+      ),
+      GoRoute(
+        path: '/about/mateo',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const MateoAboutScreen(),
+      ),
+      GoRoute(
+        path: '/materials',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const MaterialsScreen(),
       ),
       // Main shell with bottom nav (5 tabs)
       ShellRoute(

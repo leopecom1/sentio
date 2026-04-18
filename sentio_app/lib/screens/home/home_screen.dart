@@ -117,8 +117,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
 
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       backgroundColor: SentioColors.background,
+      // Let content extend to the very top so it scrolls under the blur
+      extendBodyBehindAppBar: true,
       body: Stack(
         children: [
           // Parallax animated background
@@ -126,14 +130,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // Particle overlay
           _buildParticles(),
           // Content
-          SafeArea(
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 16),
+          SingleChildScrollView(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: topPadding + 16),
                   SlideTransition(
                     position: _greetingSlide,
                     child: FadeTransition(
@@ -187,6 +190,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           child: _buildDailyPhrase(context, provider),
                         ),
                         const SizedBox(height: 20),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: _buildMaterialsBanner(context),
+                        ),
+                        const SizedBox(height: 20),
                         if (provider.thisWeekCheckins.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -199,9 +207,57 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ],
               ),
             ),
-          ),
+          // Blurred header (iOS-style liquid glass)
+          _buildBlurHeader(topPadding),
         ],
       ),
+    );
+  }
+
+  // ══════════════════════════════════════
+  // BLUR HEADER (iOS Liquid Glass style)
+  // ══════════════════════════════════════
+
+  Widget _buildBlurHeader(double topPadding) {
+    return AnimatedBuilder(
+      animation: _scrollController,
+      builder: (context, _) {
+        // Progressive blur strength based on scroll
+        final scrollOffset = _scrollController.hasClients
+            ? _scrollController.offset.clamp(0.0, 80.0)
+            : 0.0;
+        final progress = scrollOffset / 80.0;
+        final blurAmount = 20.0 * progress;
+        final bgOpacity = 0.55 * progress;
+
+        return Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: IgnorePointer(
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: blurAmount, sigmaY: blurAmount),
+                child: Container(
+                  height: topPadding + 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        SentioColors.background.withValues(alpha: bgOpacity + 0.1),
+                        SentioColors.background.withValues(alpha: bgOpacity),
+                        SentioColors.background.withValues(alpha: 0.0),
+                      ],
+                      stops: const [0.0, 0.7, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -369,8 +425,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('🔥', style: TextStyle(fontSize: 16)),
-                      const SizedBox(width: 5),
+                      const Icon(Icons.local_fire_department_rounded, size: 16, color: Colors.orange),
+                      const SizedBox(width: 4),
                       Text('$streak', style: GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.orange)),
                     ],
                   ),
@@ -772,12 +828,136 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // DAILY PHRASE (with shimmer)
   // ══════════════════════════════════════
 
+  // ══════════════════════════════════════
+  // MATERIALS & INTERVIEWS BANNER
+  // ══════════════════════════════════════
+
+  Widget _buildMaterialsBanner(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        context.push('/materials');
+      },
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF1A0033),
+              Color(0xFF2D1B69),
+              Color(0xFF0404FB),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: SentioColors.primary.withValues(alpha: 0.25),
+              blurRadius: 24,
+              spreadRadius: -4,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+              ),
+              child: const Icon(
+                Icons.play_circle_filled_rounded,
+                color: Colors.white,
+                size: 30,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF0033),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'YOUTUBE',
+                          style: GoogleFonts.manrope(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'NUEVO',
+                        style: GoogleFonts.manrope(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: SentioColors.accent,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Materiales y Entrevistas',
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Entrevistas con emprendedores y referentes',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_forward_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDailyPhrase(BuildContext context, AppProvider provider) {
     final phrase = provider.dailyPhrase.isEmpty
         ? 'No necesitás tener todas las respuestas. Solo la siguiente.'
         : provider.dailyPhrase;
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
         color: SentioColors.surface, borderRadius: BorderRadius.circular(20),

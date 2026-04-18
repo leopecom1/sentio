@@ -102,9 +102,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               Row(
                                 children: [
                                   Text(post.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: SentioColors.textPrimary)),
-                                  if (emotion != null && emotion.isNotEmpty) ...[
+                                  if (emotion != null && emotion.isNotEmpty && post.emotion != null) ...[
                                     const SizedBox(width: 6),
-                                    Text(emotion['emoji'] ?? '', style: const TextStyle(fontSize: 16)),
+                                    Icon(
+                                      SentioConstants.getEmotionIcon(post.emotion!),
+                                      size: 16,
+                                      color: Color(emotion['color'] as int),
+                                    ),
                                   ],
                                 ],
                               ),

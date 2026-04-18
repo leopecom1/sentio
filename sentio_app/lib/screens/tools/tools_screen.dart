@@ -54,11 +54,17 @@ class _ToolsScreenState extends State<ToolsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredTools = _selectedCategory == 'all'
+    final allFiltered = _selectedCategory == 'all'
         ? SentioConstants.tools
         : SentioConstants.tools
             .where((t) => t['category'] == _selectedCategory)
             .toList();
+    final featuredTool = _selectedCategory == 'all'
+        ? SentioConstants.tools.where((t) => t['featured'] == true).firstOrNull
+        : null;
+    final filteredTools = featuredTool != null
+        ? allFiltered.where((t) => t['id'] != featuredTool['id']).toList()
+        : allFiltered;
 
     return Scaffold(
       backgroundColor: SentioColors.background,
@@ -149,19 +155,28 @@ class _ToolsScreenState extends State<ToolsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            // Tools grid
+            // Tools list (featured + grid)
             Expanded(
-              child: GridView.builder(
+              child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.85,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                ),
-                itemCount: filteredTools.length,
-                itemBuilder: (context, index) {
-                  final tool = filteredTools[index];
+                physics: const BouncingScrollPhysics(),
+                children: [
+                  if (featuredTool != null) ...[
+                    _buildFeaturedCard(featuredTool),
+                    const SizedBox(height: 20),
+                  ],
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.85,
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 14,
+                    ),
+                    itemCount: filteredTools.length,
+                    itemBuilder: (context, index) {
+                      final tool = filteredTools[index];
                   final color = _getCategoryColor(tool['category']);
                   final icon = _getCategoryIcon(tool['category']);
 
@@ -237,7 +252,131 @@ class _ToolsScreenState extends State<ToolsScreen> {
                   );
                 },
               ),
+              const SizedBox(height: 24),
+                ],
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeaturedCard(Map<String, dynamic> tool) {
+    const color = Color(0xFFFF6B9D);
+    return GestureDetector(
+      onTap: () => context.push('/tool/${tool['id']}'),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              color.withValues(alpha: 0.18),
+              SentioColors.primary.withValues(alpha: 0.12),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.15),
+              blurRadius: 24,
+              spreadRadius: -4,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color, color.withValues(alpha: 0.6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    spreadRadius: -2,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 30),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star_rounded, color: Colors.white, size: 11),
+                            const SizedBox(width: 3),
+                            Text(
+                              'DESTACADO',
+                              style: GoogleFonts.manrope(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        tool['duration'],
+                        style: GoogleFonts.manrope(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    tool['title'],
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: SentioColors.textPrimary,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    tool['description'],
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      color: SentioColors.textSecondary,
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.arrow_forward_ios_rounded, size: 14, color: color),
           ],
         ),
       ),

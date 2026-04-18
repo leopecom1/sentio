@@ -5,11 +5,13 @@ import {
   BarChart3,
   FileText,
   Settings,
-  Heart,
   MessageSquare,
   LogOut,
   Trophy,
   Mail,
+  ClipboardList,
+  Scale,
+  Info,
 } from 'lucide-react';
 
 const navItems = [
@@ -19,6 +21,9 @@ const navItems = [
   { to: '/content', icon: FileText, label: 'Contenido' },
   { to: '/gamification', icon: Trophy, label: 'Gamificación' },
   { to: '/whitelist', icon: Mail, label: 'Whitelist' },
+  { to: '/assessments', icon: ClipboardList, label: 'Evaluaciones' },
+  { to: '/legal', icon: Scale, label: 'Legal' },
+  { to: '/about', icon: Info, label: 'Sobre B2Better' },
   { to: '/conversations', icon: MessageSquare, label: 'Conversaciones' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ];
@@ -32,15 +37,8 @@ export function Sidebar({ onSignOut }: SidebarProps) {
     <aside className="w-64 bg-sidebar text-white min-h-screen flex flex-col">
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-            <Heart className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold">Sentio</h1>
-            <p className="text-xs text-white/50">Admin Dashboard</p>
-          </div>
-        </div>
+        <img src="/logo.svg" alt="B2Better" className="h-7 opacity-90" />
+        <p className="text-xs text-white/40 mt-2 tracking-wide">Admin Dashboard</p>
       </div>
 
       {/* Navigation */}
@@ -75,7 +73,7 @@ export function Sidebar({ onSignOut }: SidebarProps) {
             Cerrar sesión
           </button>
         )}
-        <p className="text-xs text-white/30 text-center mt-3">Sentio Admin v1.0</p>
+        <p className="text-xs text-white/30 text-center mt-3">B2Better Admin v1.0</p>
       </div>
     </aside>
   );
