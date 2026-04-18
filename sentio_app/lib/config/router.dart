@@ -23,6 +23,7 @@ import 'package:sentio_app/screens/community/community_profile_screen.dart';
 import 'package:sentio_app/screens/community/story_viewer_screen.dart';
 import 'package:sentio_app/screens/community/create_post_screen.dart';
 import 'package:sentio_app/screens/community/create_story_screen.dart';
+import 'package:sentio_app/screens/community/validation_screen.dart';
 import 'package:sentio_app/screens/settings/notification_settings_screen.dart';
 import 'package:sentio_app/screens/finance/finance_dashboard_screen.dart';
 import 'package:sentio_app/screens/finance/finance_accounts_screen.dart';
@@ -166,6 +167,11 @@ GoRouter createRouter(AppProvider appProvider) {
         path: '/community/story/create',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const CreateStoryScreen(),
+      ),
+      GoRoute(
+        path: '/community/validate',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ValidationScreen(),
       ),
       GoRoute(
         path: '/community/story/:userId',

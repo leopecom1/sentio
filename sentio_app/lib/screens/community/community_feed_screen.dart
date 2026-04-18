@@ -7,6 +7,7 @@ import 'package:sentio_app/config/constants.dart';
 import 'package:sentio_app/providers/app_provider.dart';
 import 'package:sentio_app/models/community_post.dart';
 import 'package:sentio_app/models/community_story.dart';
+import 'package:sentio_app/models/profile.dart';
 import 'package:sentio_app/widgets/category_pills.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -118,6 +119,13 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
+
+    // ── Validation gate ──
+    final validationStatus = provider.profile?.validationStatus ?? 'not_submitted';
+    if (validationStatus != 'approved') {
+      return _ValidationGate(status: validationStatus, profile: provider.profile);
+    }
+
     final allPosts = provider.communityPosts;
     final stories = provider.communityStories;
 
@@ -845,6 +853,169 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                   ),
                 ),
               ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════
+// VALIDATION GATE (shown when profile not approved)
+// ══════════════════════════════════════
+
+class _ValidationGate extends StatelessWidget {
+  final String status;
+  final Profile? profile;
+
+  const _ValidationGate({required this.status, required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPending = status == 'pending';
+    final isRejected = status == 'rejected';
+
+    final Color accentColor;
+    final IconData icon;
+    final String title;
+    final String message;
+    final String? ctaLabel;
+
+    if (isPending) {
+      accentColor = SentioColors.primary;
+      icon = Icons.hourglass_top_rounded;
+      title = 'Tu perfil está en revisión';
+      message = 'Nuestro equipo está revisando tu solicitud. Te avisaremos cuando esté aprobada — normalmente menos de 24 horas.';
+      ctaLabel = null;
+    } else if (isRejected) {
+      accentColor = SentioColors.warning;
+      icon = Icons.info_outline_rounded;
+      title = 'Necesitamos más información';
+      message = profile?.validationRejectionReason ??
+          'Revisamos tu perfil y no encontramos suficiente información para confirmar que estás construyendo un negocio. Si estás empezando y todavía no tenés mucho para mostrar, mandános una descripción breve de qué estás construyendo, para quién, y cuál es tu mayor desafío hoy.';
+      ctaLabel = 'Volver a intentarlo';
+    } else {
+      // not_submitted
+      accentColor = SentioColors.accent;
+      icon = Icons.workspace_premium_rounded;
+      title = 'Comunidad cerrada';
+      message = 'B2Better es un espacio para emprendedores, freelancers y profesionales que están construyendo algo real. Validá tu perfil para acceder.';
+      ctaLabel = 'Validar mi perfil';
+    }
+
+    return Scaffold(
+      backgroundColor: SentioColors.background,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      accentColor.withValues(alpha: 0.3),
+                      accentColor.withValues(alpha: 0.05),
+                      Colors.transparent,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accentColor.withValues(alpha: 0.3),
+                      blurRadius: 40,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: accentColor, size: 54),
+              ),
+              const SizedBox(height: 32),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.manrope(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: SentioColors.textPrimary,
+                  letterSpacing: -0.7,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  color: SentioColors.textSecondary,
+                  height: 1.6,
+                ),
+              ),
+              if (isPending && profile?.validationAnswer != null) ...[
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: SentioColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: SentioColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.history_rounded, size: 14, color: SentioColors.textTertiary),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Tu respuesta',
+                            style: GoogleFonts.manrope(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: SentioColors.textTertiary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        profile!.validationAnswer!,
+                        style: GoogleFonts.manrope(
+                          fontSize: 13,
+                          color: SentioColors.textPrimary,
+                          fontStyle: FontStyle.italic,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (ctaLabel != null) ...[
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => context.push('/community/validate'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentColor,
+                      foregroundColor: accentColor == SentioColors.accent ? Colors.black : Colors.white,
+                    ),
+                    child: Text(
+                      ctaLabel,
+                      style: GoogleFonts.manrope(
+                        fontWeight: FontWeight.w800,
+                        color: accentColor == SentioColors.accent ? Colors.black : Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

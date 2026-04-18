@@ -1048,6 +1048,39 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  // ============ COMMUNITY VALIDATION ============
+
+  /// Submit validation. If URL provided → auto-approve. Else → pending manual review.
+  Future<bool> submitCommunityValidation({
+    String? url,
+    String? answer,
+  }) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return false;
+
+    final hasUrl = url != null && url.trim().isNotEmpty;
+    // Auto-approve if URL is provided, else pending manual review
+    final status = hasUrl ? 'approved' : 'pending';
+
+    try {
+      await _supabase.from('profiles').update({
+        'validation_status': status,
+        'validation_url': hasUrl ? url.trim() : null,
+        'validation_answer': answer?.trim().isEmpty ?? true ? null : answer!.trim(),
+        'validation_submitted_at': DateTime.now().toIso8601String(),
+        'validation_rejection_reason': null,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', userId);
+
+      await _loadProfile(userId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error submitting validation: $e');
+      return false;
+    }
+  }
+
   /// Upload avatar image to Supabase storage and update profile
   Future<String?> uploadAvatar(Uint8List bytes) async {
     final userId = _supabase.auth.currentUser?.id;

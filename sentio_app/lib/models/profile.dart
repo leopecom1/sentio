@@ -28,6 +28,11 @@ class Profile {
   final int followingCount;
   final int totalTransactions;
   final String preferredCurrency;
+  final String validationStatus;
+  final String? validationUrl;
+  final String? validationAnswer;
+  final String? validationRejectionReason;
+  final DateTime? validationSubmittedAt;
   final DateTime createdAt;
 
   Profile({
@@ -60,6 +65,11 @@ class Profile {
     this.followingCount = 0,
     this.totalTransactions = 0,
     this.preferredCurrency = 'ARS',
+    this.validationStatus = 'not_submitted',
+    this.validationUrl,
+    this.validationAnswer,
+    this.validationRejectionReason,
+    this.validationSubmittedAt,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -98,6 +108,13 @@ class Profile {
       followingCount: json['following_count'] ?? 0,
       totalTransactions: json['total_transactions'] ?? 0,
       preferredCurrency: json['preferred_currency'] ?? 'ARS',
+      validationStatus: json['validation_status'] ?? 'not_submitted',
+      validationUrl: json['validation_url'],
+      validationAnswer: json['validation_answer'],
+      validationRejectionReason: json['validation_rejection_reason'],
+      validationSubmittedAt: json['validation_submitted_at'] != null
+          ? DateTime.parse(json['validation_submitted_at'])
+          : null,
       createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
     );
   }
