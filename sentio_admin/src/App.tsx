@@ -6,6 +6,8 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { ContentPage } from './pages/ContentPage';
 import { ConversationsPage } from './pages/ConversationsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { GamificationPage } from './pages/GamificationPage';
+import { WhitelistPage } from './pages/WhitelistPage';
 import { LoginPage } from './pages/LoginPage';
 import { useAdminAuth } from './hooks/useAdminAuth';
 
@@ -32,6 +34,8 @@ export default function App() {
           <Route path="/users" element={<UsersPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/content" element={<ContentPage />} />
+          <Route path="/gamification" element={<GamificationPage />} />
+          <Route path="/whitelist" element={<WhitelistPage />} />
           <Route path="/conversations" element={<ConversationsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

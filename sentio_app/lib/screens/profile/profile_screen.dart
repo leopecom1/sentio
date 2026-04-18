@@ -212,7 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     GestureDetector(
                       onTap: () {
                         provider.signOut();
-                        context.go('/onboarding');
+                        context.go('/auth');
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -269,7 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/home');
+              context.go('/');
             }
           },
           child: Container(

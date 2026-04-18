@@ -99,7 +99,7 @@ class CrisisScreen extends StatelessWidget {
                 subtitle: 'Tu asistente está acá para escucharte',
                 onTap: () {
                   context.pop();
-                  context.go('/chat');
+                  context.push('/chat');
                 },
               ),
               const SizedBox(height: 24),

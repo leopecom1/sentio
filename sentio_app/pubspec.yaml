@@ -48,10 +48,11 @@ dev_dependencies:
   flutter_native_splash: ^2.4.0
 
 flutter_native_splash:
-  background_image: "assets/images/splash_background.png"
+  color: "#000000"
+  image: "assets/images/splash_logo.png"
   android_12:
     image: "assets/images/splash_logo.png"
-    icon_background_color: "#FFFFFF"
+    color: "#000000"
 
 flutter:
   uses-material-design: true

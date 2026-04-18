@@ -120,6 +120,13 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     final provider = context.watch<AppProvider>();
     final allPosts = provider.communityPosts;
     final stories = provider.communityStories;
+
+    // Group stories by user - one circle per user
+    final Map<String, List<CommunityStory>> storiesByUser = {};
+    for (final story in stories) {
+      storiesByUser.putIfAbsent(story.userId, () => []).add(story);
+    }
+    final groupedUserIds = storiesByUser.keys.toList();
     final selectedCategory = provider.selectedCommunityCategory;
 
     // Filter posts by category
@@ -294,13 +301,16 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: stories.length + 1,
+                      itemCount: groupedUserIds.length + 1,
                       itemBuilder: (context, index) {
                         if (index == 0) {
                           return _buildAddStoryCircle();
                         }
-                        final story = stories[index - 1];
-                        return _buildStoryCircle(story, index - 1);
+                        final userId = groupedUserIds[index - 1];
+                        final userStories = storiesByUser[userId]!;
+                        final latestStory = userStories.first;
+                        final allViewed = userStories.every((s) => s.isViewed);
+                        return _buildStoryCircle(latestStory, userId, allViewed);
                       },
                     ),
                   ),
@@ -438,9 +448,9 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     );
   }
 
-  Widget _buildStoryCircle(CommunityStory story, int storyIndex) {
+  Widget _buildStoryCircle(CommunityStory story, String userId, bool allViewed) {
     return GestureDetector(
-      onTap: () => context.push('/community/story/$storyIndex'),
+      onTap: () => context.push('/community/story/$userId'),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6),
         child: Column(
@@ -452,14 +462,14 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
               padding: const EdgeInsets.all(2.5),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: story.isViewed
+                gradient: allViewed
                     ? null
                     : const LinearGradient(
                         colors: [SentioColors.primary, SentioColors.accent],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                border: story.isViewed
+                border: allViewed
                     ? Border.all(color: SentioColors.divider, width: 2)
                     : null,
               ),
@@ -516,7 +526,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                 style: GoogleFonts.manrope(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  color: story.isViewed ? SentioColors.textTertiary : SentioColors.textPrimary,
+                  color: allViewed ? SentioColors.textTertiary : SentioColors.textPrimary,
                 ),
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,

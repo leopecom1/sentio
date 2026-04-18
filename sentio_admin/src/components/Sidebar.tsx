@@ -8,6 +8,8 @@ import {
   Heart,
   MessageSquare,
   LogOut,
+  Trophy,
+  Mail,
 } from 'lucide-react';
 
 const navItems = [
@@ -15,6 +17,8 @@ const navItems = [
   { to: '/users', icon: Users, label: 'Usuarios' },
   { to: '/analytics', icon: BarChart3, label: 'Analíticas' },
   { to: '/content', icon: FileText, label: 'Contenido' },
+  { to: '/gamification', icon: Trophy, label: 'Gamificación' },
+  { to: '/whitelist', icon: Mail, label: 'Whitelist' },
   { to: '/conversations', icon: MessageSquare, label: 'Conversaciones' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ];

@@ -68,12 +68,34 @@ class _ToolsScreenState extends State<ToolsScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-              child: Text(
-                'Herramientas',
-                style: GoogleFonts.manrope(
-                  fontSize: 28,
-                  color: SentioColors.textPrimary,
-                ),
+              child: Row(
+                children: [
+                  if (context.canPop())
+                    GestureDetector(
+                      onTap: () => context.pop(),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        margin: const EdgeInsets.only(right: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: SentioColors.textPrimary,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  Text(
+                    'Herramientas',
+                    style: GoogleFonts.manrope(
+                      fontSize: 28,
+                      color: SentioColors.textPrimary,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 4),

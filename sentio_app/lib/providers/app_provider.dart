@@ -16,8 +16,10 @@ import 'package:sentio_app/models/gamification.dart';
 import 'package:sentio_app/services/notification_service.dart';
 import 'package:sentio_app/services/community_service.dart';
 import 'package:sentio_app/services/finance_service.dart';
+import 'package:sentio_app/services/gamification_service.dart';
 import 'package:sentio_app/models/financial_account.dart';
 import 'package:sentio_app/models/financial_transaction.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum CelebrationEvent { xpGained, streakMilestone, levelUp, achievementUnlocked }
 
@@ -72,6 +74,7 @@ class AppProvider extends ChangeNotifier {
 
   // Celebrations queue
   final List<CelebrationData> _pendingCelebrations = [];
+  Set<String> _celebratedAchievementIds = {};
 
   // Getters
   Profile? get profile => _profile;
@@ -196,12 +199,6 @@ class AppProvider extends ChangeNotifier {
     final p = _profile;
     if (p == null) return;
 
-    // Track previously unlocked
-    final oldUnlocked = _achievements
-        .where((a) => a.isUnlocked)
-        .map((a) => a.id)
-        .toSet();
-
     final defs = Achievement.definitions;
     _achievements = defs.map((d) {
       bool unlocked = false;
@@ -232,15 +229,20 @@ class AppProvider extends ChangeNotifier {
       );
     }).toList();
 
-    // Enqueue celebrations for newly unlocked achievements
+    // Enqueue celebrations only for achievements not yet celebrated
     for (final a in _achievements) {
-      if (a.isUnlocked && !oldUnlocked.contains(a.id)) {
+      if (a.isUnlocked && !_celebratedAchievementIds.contains(a.id)) {
         _pendingCelebrations.add(CelebrationData(
           event: CelebrationEvent.achievementUnlocked,
           achievement: a,
         ));
+        _celebratedAchievementIds.add(a.id);
       }
     }
+    // Persist celebrated achievements
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setStringList('celebrated_achievements', _celebratedAchievementIds.toList());
+    });
   }
 
   void setLoading(bool value) {
@@ -250,6 +252,10 @@ class AppProvider extends ChangeNotifier {
 
   // ============ INIT ============
   Future<void> initialize() async {
+    // Load celebrated achievements from local storage
+    final prefs = await SharedPreferences.getInstance();
+    _celebratedAchievementIds = (prefs.getStringList('celebrated_achievements') ?? []).toSet();
+
     final session = _supabase.auth.currentSession;
     if (session != null) {
       _isAuthenticated = true;
@@ -259,6 +265,9 @@ class AppProvider extends ChangeNotifier {
         debugPrint('User data loading timed out or failed: $e');
       }
     }
+
+    // Load gamification config from server
+    await GamificationService.instance.loadConfig();
 
     // Load community data from Supabase
     await loadCommunityData();
@@ -423,6 +432,10 @@ class AppProvider extends ChangeNotifier {
     _routines = [];
     _financialAccounts = [];
     _financialTransactions = [];
+    _celebratedAchievementIds = {};
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.remove('celebrated_achievements');
+    });
   }
 
   // ============ AUTH ============
@@ -1221,8 +1234,8 @@ class AppProvider extends ChangeNotifier {
     return _communityService.loadPostsByUser(userId);
   }
 
-  Future<void> createCommunityStory(String textOverlay) async {
-    final story = await _communityService.createStory(textOverlay: textOverlay);
+  Future<void> createCommunityStory(String textOverlay, {String? imageUrl}) async {
+    final story = await _communityService.createStory(textOverlay: textOverlay, imageUrl: imageUrl);
     if (story != null) {
       _communityStories.insert(0, story);
       notifyListeners();

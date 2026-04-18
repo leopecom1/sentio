@@ -353,9 +353,14 @@ class _JournalEntryScreenState extends State<JournalEntryScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      _selectedEmotion != null ? _emotionEmoji : '😊',
-                      style: const TextStyle(fontSize: 18),
+                    Icon(
+                      _selectedEmotion != null
+                          ? SentioConstants.getEmotionIcon(_selectedEmotion!)
+                          : Icons.mood_rounded,
+                      size: 18,
+                      color: _selectedEmotion != null
+                          ? _emotionColor
+                          : SentioColors.textSecondary,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -411,42 +416,44 @@ class _JournalEntryScreenState extends State<JournalEntryScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: SentioColors.divider,
-                  borderRadius: BorderRadius.circular(2),
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: SentioColors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              '¿Cómo te sentís ahora?',
-              style: GoogleFonts.manrope(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: SentioColors.textPrimary,
+              const SizedBox(height: 20),
+              Text(
+                '¿Cómo te sentís ahora?',
+                style: GoogleFonts.manrope(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: SentioColors.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Asociá una emoción a esta entrada',
-              style: GoogleFonts.manrope(
-                fontSize: 14,
-                color: SentioColors.textSecondary,
+              const SizedBox(height: 4),
+              Text(
+                'Asociá una emoción a esta entrada',
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  color: SentioColors.textSecondary,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Wrap(
+              const SizedBox(height: 20),
+              Wrap(
               spacing: 8,
               runSpacing: 8,
               children: SentioConstants.emotions.map((emotion) {
@@ -485,8 +492,11 @@ class _JournalEntryScreenState extends State<JournalEntryScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(emotion['emoji'],
-                            style: const TextStyle(fontSize: 18)),
+                        Icon(
+                          SentioConstants.getEmotionIcon(emotion['id']),
+                          size: 18,
+                          color: isSelected ? color : SentioColors.textSecondary,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           emotion['label'],
@@ -507,6 +517,7 @@ class _JournalEntryScreenState extends State<JournalEntryScreen>
             ),
             const SizedBox(height: 12),
           ],
+          ),
         ),
       ),
     );

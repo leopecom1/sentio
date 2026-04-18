@@ -5,22 +5,23 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentio_app/config/theme.dart';
 import 'package:sentio_app/providers/app_provider.dart';
+import 'package:sentio_app/models/community_story.dart';
 
 class StoryViewerScreen extends StatefulWidget {
-  final int initialIndex;
-  const StoryViewerScreen({super.key, required this.initialIndex});
+  final String userId;
+  const StoryViewerScreen({super.key, required this.userId});
 
   @override
   State<StoryViewerScreen> createState() => _StoryViewerScreenState();
 }
 
 class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTickerProviderStateMixin {
-  late int _currentIndex;
+  int _currentIndex = 0;
   late AnimationController _progressController;
   Timer? _autoAdvanceTimer;
   bool _isNavigating = false;
+  late List<CommunityStory> _userStories;
 
-  // Gradient backgrounds for stories (so they look beautiful even without network images)
   static const List<List<Color>> _storyGradients = [
     [Color(0xFF1a1a2e), Color(0xFF16213e), Color(0xFF0f3460)],
     [Color(0xFF2d1b69), Color(0xFF11998e), Color(0xFF38ef7d)],
@@ -32,11 +33,14 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
     _progressController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 5),
     );
+    final provider = context.read<AppProvider>();
+    _userStories = provider.communityStories
+        .where((s) => s.userId == widget.userId)
+        .toList();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startProgress();
     });
@@ -45,9 +49,8 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
   void _startProgress() {
     if (!mounted || _isNavigating) return;
     final provider = context.read<AppProvider>();
-    final stories = provider.communityStories;
-    if (_currentIndex < stories.length) {
-      provider.markStoryViewed(stories[_currentIndex].id);
+    if (_currentIndex < _userStories.length) {
+      provider.markStoryViewed(_userStories[_currentIndex].id);
     }
 
     _progressController.reset();
@@ -68,8 +71,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
 
   void _nextStory() {
     if (!mounted || _isNavigating) return;
-    final provider = context.read<AppProvider>();
-    if (_currentIndex < provider.communityStories.length - 1) {
+    if (_currentIndex < _userStories.length - 1) {
       setState(() => _currentIndex++);
       _startProgress();
     } else {
@@ -101,14 +103,11 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<AppProvider>();
-    final stories = provider.communityStories;
-
-    if (_currentIndex >= stories.length) {
+    if (_userStories.isEmpty || _currentIndex >= _userStories.length) {
       return const Scaffold(backgroundColor: Colors.black);
     }
 
-    final story = stories[_currentIndex];
+    final story = _userStories[_currentIndex];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -124,7 +123,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Gradient background (always visible, beautiful even without network)
+            // Gradient background
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -134,7 +133,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
                 ),
               ),
             ),
-            // Network image on top (optional, if it loads)
+            // Network image on top
             if (story.imageUrl.isNotEmpty)
               CachedNetworkImage(
                 imageUrl: story.imageUrl,
@@ -170,13 +169,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
                 ),
               ),
             ),
-            // Progress bars
+            // Progress bars (one per user story)
             Positioned(
               top: MediaQuery.of(context).padding.top + 8,
               left: 16,
               right: 16,
               child: Row(
-                children: List.generate(stories.length, (i) {
+                children: List.generate(_userStories.length, (i) {
                   return Expanded(
                     child: Container(
                       height: 3,
@@ -247,7 +246,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
               ),
             ),
             // Text overlay
-            if (story.textOverlay != null)
+            if (story.textOverlay != null && story.textOverlay!.isNotEmpty)
               Center(
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 32),

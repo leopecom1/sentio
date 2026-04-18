@@ -131,7 +131,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
               ),
               child: Center(
                 child: Icon(
-                  IconData(emotion['icon'] as int, fontFamily: 'MaterialIcons'),
+                  SentioConstants.getEmotionIcon(emotion['id']),
                   color: Color(emotion['color'] as int),
                   size: 36,
                 ),
@@ -392,7 +392,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                         ),
                         child: Center(
                           child: Icon(
-                            IconData(emotion['icon'] as int, fontFamily: 'MaterialIcons'),
+                            SentioConstants.getEmotionIcon(emotion['id']),
                             color: isSelected ? color : SentioColors.textSecondary,
                             size: 28,
                           ),

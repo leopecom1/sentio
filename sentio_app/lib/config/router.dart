@@ -43,12 +43,14 @@ GoRouter createRouter(AppProvider appProvider) {
       final hasOnboarded = appProvider.hasCompletedOnboarding;
       final currentPath = state.matchedLocation;
 
-      // TODO: Remove this bypass after testing community feature
-      if (!isAuthenticated || !hasOnboarded) {
-        if (currentPath == '/auth' || currentPath == '/onboarding') {
-          return '/';
-        }
-        return null;
+      if (!isAuthenticated) {
+        if (currentPath == '/auth') return null;
+        return '/auth';
+      }
+
+      if (!hasOnboarded) {
+        if (currentPath == '/onboarding') return null;
+        return '/onboarding';
       }
 
       if (currentPath == '/auth' || currentPath == '/onboarding') {
@@ -160,10 +162,10 @@ GoRouter createRouter(AppProvider appProvider) {
         builder: (context, state) => const CreateStoryScreen(),
       ),
       GoRoute(
-        path: '/community/story/:index',
+        path: '/community/story/:userId',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => StoryViewerScreen(
-          initialIndex: int.tryParse(state.pathParameters['index'] ?? '0') ?? 0,
+          userId: state.pathParameters['userId'] ?? '',
         ),
       ),
       // Chat - full screen (accessible from home quick actions)

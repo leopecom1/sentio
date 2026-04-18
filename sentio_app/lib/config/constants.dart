@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class SentioConstants {
   static const String appName = 'Sentio';
   static const String tagline = 'Tu espacio para sentir, entender y avanzar.';
@@ -9,24 +11,46 @@ class SentioConstants {
   // OpenAI
   static const String openaiApiKey = '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';
 
-  // Emotions (with Material Icons for new UI + emojis for legacy)
+  // Emotions
   static const List<Map<String, dynamic>> emotions = [
-    {'id': 'calm', 'label': 'Tranquilo', 'emoji': '😌', 'icon': 0xe57f, 'color': 0xFF7B9E87},         // Icons.self_improvement
-    {'id': 'focused', 'label': 'Enfocado', 'emoji': '🎯', 'icon': 0xe0b5, 'color': 0xFF3D5A80},       // Icons.center_focus_strong
-    {'id': 'motivated', 'label': 'Motivado', 'emoji': '🔥', 'icon': 0xea0b, 'color': 0xFFC9A96E},     // Icons.local_fire_department
-    {'id': 'grateful', 'label': 'Agradecido', 'emoji': '🙏', 'icon': 0xeadb, 'color': 0xFF9B8EC4},    // Icons.volunteer_activism
-    {'id': 'hopeful', 'label': 'Esperanzado', 'emoji': '✨', 'icon': 0xe838, 'color': 0xFF6DB3C4},     // Icons.star
-    {'id': 'tired', 'label': 'Cansado', 'emoji': '😮‍💨', 'icon': 0xe157, 'color': 0xFF8E8E93},         // Icons.airline_seat_flat
-    {'id': 'overwhelmed', 'label': 'Abrumado', 'emoji': '😰', 'icon': 0xef67, 'color': 0xFFD4A574},    // Icons.sentiment_very_dissatisfied
-    {'id': 'anxious', 'label': 'Ansioso', 'emoji': '😟', 'icon': 0xef65, 'color': 0xFFD4856A},         // Icons.sentiment_worried (mapped)
-    {'id': 'frustrated', 'label': 'Frustrado', 'emoji': '😤', 'icon': 0xe000, 'color': 0xFFC75B5B},    // Icons.warning_amber
-    {'id': 'sad', 'label': 'Triste', 'emoji': '😔', 'icon': 0xef66, 'color': 0xFF7A8BA8},              // Icons.sentiment_dissatisfied
-    {'id': 'insecure', 'label': 'Inseguro', 'emoji': '🫣', 'icon': 0xef71, 'color': 0xFFB8A9C9},       // Icons.shield_outlined
-    {'id': 'lonely', 'label': 'Solo', 'emoji': '🧍', 'icon': 0xe7fd, 'color': 0xFF8B9DC3},             // Icons.person_outline
-    {'id': 'pressured', 'label': 'Presionado', 'emoji': '⚡', 'icon': 0xe0ce, 'color': 0xFFCC8B6E},    // Icons.bolt
-    {'id': 'angry', 'label': 'Enojado', 'emoji': '😠', 'icon': 0xeb47, 'color': 0xFFBF4E4E},           // Icons.whatshot
-    {'id': 'blocked', 'label': 'Bloqueado', 'emoji': '🧱', 'icon': 0xe14b, 'color': 0xFF6B7280},       // Icons.block
+    {'id': 'calm', 'label': 'Tranquilo', 'emoji': '😌', 'color': 0xFF7B9E87},
+    {'id': 'focused', 'label': 'Enfocado', 'emoji': '🎯', 'color': 0xFF3D5A80},
+    {'id': 'motivated', 'label': 'Motivado', 'emoji': '🔥', 'color': 0xFFC9A96E},
+    {'id': 'grateful', 'label': 'Agradecido', 'emoji': '🙏', 'color': 0xFF9B8EC4},
+    {'id': 'hopeful', 'label': 'Esperanzado', 'emoji': '✨', 'color': 0xFF6DB3C4},
+    {'id': 'tired', 'label': 'Cansado', 'emoji': '💤', 'color': 0xFF8E8E93},
+    {'id': 'overwhelmed', 'label': 'Abrumado', 'emoji': '😰', 'color': 0xFFD4A574},
+    {'id': 'anxious', 'label': 'Ansioso', 'emoji': '😟', 'color': 0xFFD4856A},
+    {'id': 'frustrated', 'label': 'Frustrado', 'emoji': '😤', 'color': 0xFFC75B5B},
+    {'id': 'sad', 'label': 'Triste', 'emoji': '😔', 'color': 0xFF7A8BA8},
+    {'id': 'insecure', 'label': 'Inseguro', 'emoji': '😣', 'color': 0xFFB8A9C9},
+    {'id': 'lonely', 'label': 'Solo', 'emoji': '🫂', 'color': 0xFF8B9DC3},
+    {'id': 'pressured', 'label': 'Presionado', 'emoji': '⚡', 'color': 0xFFCC8B6E},
+    {'id': 'angry', 'label': 'Enojado', 'emoji': '😠', 'color': 0xFFBF4E4E},
+    {'id': 'blocked', 'label': 'Bloqueado', 'emoji': '🚫', 'color': 0xFF6B7280},
   ];
+
+  /// Get Material Icon for an emotion (guaranteed to render)
+  static IconData getEmotionIcon(String emotionId) {
+    switch (emotionId) {
+      case 'calm': return Icons.self_improvement_rounded;
+      case 'focused': return Icons.center_focus_strong_rounded;
+      case 'motivated': return Icons.local_fire_department_rounded;
+      case 'grateful': return Icons.favorite_rounded;
+      case 'hopeful': return Icons.auto_awesome_rounded;
+      case 'tired': return Icons.bedtime_rounded;
+      case 'overwhelmed': return Icons.waves_rounded;
+      case 'anxious': return Icons.speed_rounded;
+      case 'frustrated': return Icons.mood_bad_rounded;
+      case 'sad': return Icons.sentiment_dissatisfied_rounded;
+      case 'insecure': return Icons.shield_outlined;
+      case 'lonely': return Icons.person_outline_rounded;
+      case 'pressured': return Icons.bolt_rounded;
+      case 'angry': return Icons.whatshot_rounded;
+      case 'blocked': return Icons.block_rounded;
+      default: return Icons.circle_outlined;
+    }
+  }
 
   // Community categories
   static const List<String> communityCategories = [

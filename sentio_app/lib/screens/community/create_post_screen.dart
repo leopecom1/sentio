@@ -30,7 +30,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     await provider.createCommunityPost(text, emotion: _selectedEmotion);
     // Reload so the feed shows the new post
     provider.loadCommunityData();
-    if (mounted) context.pop();
+    if (mounted) context.go('/community');
   }
 
   @override
