@@ -433,6 +433,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 );
               },
             ),
+          const SizedBox(width: 8),
+          // Notification bell
+          _NotificationBell(unreadCount: provider.unreadNotifications),
         ],
       ),
     );
@@ -481,7 +484,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Center(child: Text(emotion['emoji'], style: const TextStyle(fontSize: 26))),
+                      child: Center(
+                        child: Icon(
+                          SentioConstants.getEmotionIcon(emotion['id']),
+                          color: emotionColor,
+                          size: 28,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -1195,4 +1204,68 @@ class _ParticlePainter extends CustomPainter {
 class _QA {
   final IconData icon; final String label; final Color color; final VoidCallback onTap;
   const _QA(this.icon, this.label, this.color, this.onTap);
+}
+
+// ══════════════════════════════════════
+// NOTIFICATION BELL WITH BADGE
+// ══════════════════════════════════════
+
+class _NotificationBell extends StatelessWidget {
+  final int unreadCount;
+  const _NotificationBell({required this.unreadCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        context.push('/notifications');
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              shape: BoxShape.circle,
+              border: Border.all(color: SentioColors.border),
+            ),
+            child: Icon(
+              Icons.notifications_rounded,
+              color: unreadCount > 0 ? SentioColors.accent : SentioColors.textSecondary,
+              size: 20,
+            ),
+          ),
+          if (unreadCount > 0)
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                decoration: BoxDecoration(
+                  color: SentioColors.error,
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: SentioColors.background, width: 2),
+                  boxShadow: [
+                    BoxShadow(color: SentioColors.error.withValues(alpha: 0.5), blurRadius: 6),
+                  ],
+                ),
+                child: Text(
+                  unreadCount > 9 ? '9+' : '$unreadCount',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.manrope(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

@@ -41,24 +41,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
+  bool _completing = false;
+
   Future<void> _complete() async {
+    if (_completing) return;
     final provider = context.read<AppProvider>();
 
     if (!provider.isAuthenticated) {
-      // If not authenticated, go to auth first
       context.go('/auth');
       return;
     }
 
-    await provider.completeOnboarding(
-      pressureTypes: _selectedPressures,
-      currentMood: _selectedMood,
-      energy: _energy,
-      goals: _selectedGoals,
-    );
-
-    if (!mounted) return;
-    context.go('/');
+    setState(() => _completing = true);
+    try {
+      await provider.completeOnboarding(
+        pressureTypes: _selectedPressures,
+        currentMood: _selectedMood.isEmpty ? 'calm' : _selectedMood,
+        energy: _energy,
+        goals: _selectedGoals,
+      );
+      if (!mounted) return;
+      context.go('/');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _completing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo completar: $e'),
+          backgroundColor: SentioColors.error,
+        ),
+      );
+    }
   }
 
   @override
@@ -180,7 +193,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Sentio es tu espacio para bajar la guardia,\nentenderte y avanzar con más claridad.',
+            'B2Better es tu espacio para bajar la guardia,\nentenderte y avanzar con más claridad.',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: SentioColors.textSecondary,
                   height: 1.5,
@@ -591,8 +604,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const Spacer(flex: 3),
           ElevatedButton(
-            onPressed: _complete,
-            child: const Text('Empezar'),
+            onPressed: _completing ? null : _complete,
+            child: _completing
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('Empezar'),
           ),
           const SizedBox(height: 24),
         ],

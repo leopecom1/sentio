@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -17,6 +18,7 @@ import 'package:sentio_app/models/gamification.dart';
 import 'package:sentio_app/services/notification_service.dart';
 import 'package:sentio_app/services/community_service.dart';
 import 'package:sentio_app/services/finance_service.dart';
+import 'package:sentio_app/services/notifications_service.dart';
 import 'package:sentio_app/services/gamification_service.dart';
 import 'package:sentio_app/models/financial_account.dart';
 import 'package:sentio_app/models/financial_transaction.dart';
@@ -70,6 +72,11 @@ class AppProvider extends ChangeNotifier {
   List<FinancialTransaction> _financialTransactions = [];
   List<CustomCategory> _customCategories = [];
 
+  // Notifications
+  List<AppNotification> _notifications = [];
+  int _unreadNotifications = 0;
+  Timer? _notificationsPolling;
+
   // Gamification
   int _totalXp = 0;
   String _selectedCommunityCategory = 'Todo';
@@ -91,6 +98,7 @@ class AppProvider extends ChangeNotifier {
   Checkin? get todayCheckin => _todayCheckin;
   String get dailyPhrase => _dailyPhrase;
   bool get hasCompletedOnboarding => _profile?.onboardingCompleted ?? false;
+  bool get isApproved => _profile?.isApproved ?? false;
   String get userName => _profile?.firstName ?? 'amigo';
   List<Map<String, dynamic>> get articles => _articles;
   List<Map<String, dynamic>> get routines => _routines;
@@ -105,6 +113,54 @@ class AppProvider extends ChangeNotifier {
   List<CustomCategory> get customCategories => _customCategories;
   List<CustomCategory> customCategoriesForType(String type) =>
       _customCategories.where((c) => c.type == type).toList();
+
+  // Notifications getters
+  List<AppNotification> get notifications => _notifications;
+  int get unreadNotifications => _unreadNotifications;
+
+  // ============ NOTIFICATIONS ============
+  Future<void> loadNotifications() async {
+    _notifications = await NotificationsService.instance.loadAll();
+    _unreadNotifications = _notifications.where((n) => !n.isRead).length;
+    notifyListeners();
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    await NotificationsService.instance.markAsRead(id);
+    _notifications = _notifications.map((n) => n.id == id ? n.copyWith(isRead: true) : n).toList();
+    _unreadNotifications = _notifications.where((n) => !n.isRead).length;
+    notifyListeners();
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    await NotificationsService.instance.markAllAsRead();
+    _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
+    _unreadNotifications = 0;
+    notifyListeners();
+  }
+
+  Future<void> deleteNotification(String id) async {
+    await NotificationsService.instance.delete(id);
+    _notifications = _notifications.where((n) => n.id != id).toList();
+    _unreadNotifications = _notifications.where((n) => !n.isRead).length;
+    notifyListeners();
+  }
+
+  void _startNotificationsPolling() {
+    _notificationsPolling?.cancel();
+    _notificationsPolling = Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (_supabase.auth.currentUser == null) return;
+      final count = await NotificationsService.instance.unreadCount();
+      if (count != _unreadNotifications) {
+        await loadNotifications();
+      }
+    });
+  }
+
+  void _stopNotificationsPolling() {
+    _notificationsPolling?.cancel();
+    _notificationsPolling = null;
+  }
 
   double get totalBalance {
     return _financialAccounts.fold(0.0, (sum, a) => sum + a.balance);
@@ -395,6 +451,16 @@ class AppProvider extends ChangeNotifier {
     // Load celebrated achievements BEFORE calculating XP so we don't re-celebrate
     await _loadCelebratedAchievements();
     _calculateXp();
+    // Load notifications and start polling
+    await loadNotifications();
+    _startNotificationsPolling();
+    notifyListeners();
+  }
+
+  Future<void> refreshProfile() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    await _loadProfile(userId);
     notifyListeners();
   }
 
@@ -524,6 +590,9 @@ class AppProvider extends ChangeNotifier {
     _routines = [];
     _financialAccounts = [];
     _financialTransactions = [];
+    _notifications = [];
+    _unreadNotifications = 0;
+    _stopNotificationsPolling();
     _celebratedAchievementIds = {};
     // NOTE: do NOT delete 'celebrated_achievements_*' keys — they are per-user
     // and should survive sign-out so the user doesn't see celebrations again
@@ -587,14 +656,15 @@ class AppProvider extends ChangeNotifier {
     if (userId == null) return;
 
     try {
-      await _supabase.from('profiles').update({
+      await _supabase.from('profiles').upsert({
+        'id': userId,
         'onboarding_completed': true,
         'pressure_types': pressureTypes,
         'current_mood': currentMood,
         'initial_energy': energy,
         'goals': goals,
         'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', userId);
+      });
 
       // Reload profile
       await _loadProfile(userId);

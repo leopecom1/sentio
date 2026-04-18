@@ -33,6 +33,9 @@ class Profile {
   final String? validationAnswer;
   final String? validationRejectionReason;
   final DateTime? validationSubmittedAt;
+  final bool isApproved;
+  final DateTime? approvedAt;
+  final String? email;
   final DateTime createdAt;
 
   Profile({
@@ -70,6 +73,9 @@ class Profile {
     this.validationAnswer,
     this.validationRejectionReason,
     this.validationSubmittedAt,
+    this.isApproved = false,
+    this.approvedAt,
+    this.email,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -115,6 +121,11 @@ class Profile {
       validationSubmittedAt: json['validation_submitted_at'] != null
           ? DateTime.parse(json['validation_submitted_at'])
           : null,
+      isApproved: json['is_approved'] ?? false,
+      approvedAt: json['approved_at'] != null
+          ? DateTime.parse(json['approved_at'])
+          : null,
+      email: json['email'],
       createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
     );
   }

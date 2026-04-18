@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentio_app/providers/app_provider.dart';
 import 'package:sentio_app/screens/auth/auth_screen.dart';
+import 'package:sentio_app/screens/auth/pending_approval_screen.dart';
 import 'package:sentio_app/screens/onboarding/onboarding_screen.dart';
 import 'package:sentio_app/screens/home/home_screen.dart';
 import 'package:sentio_app/screens/checkin/checkin_screen.dart';
@@ -33,6 +34,7 @@ import 'package:sentio_app/screens/finance/finance_advisor_screen.dart';
 import 'package:sentio_app/screens/legal/legal_screen.dart';
 import 'package:sentio_app/screens/about/mateo_about_screen.dart';
 import 'package:sentio_app/screens/materials/materials_screen.dart';
+import 'package:sentio_app/screens/notifications/notifications_screen.dart';
 import 'package:sentio_app/widgets/main_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -46,6 +48,8 @@ GoRouter createRouter(AppProvider appProvider) {
     redirect: (context, state) {
       final isAuthenticated = appProvider.isAuthenticated;
       final hasOnboarded = appProvider.hasCompletedOnboarding;
+      final isApproved = appProvider.isApproved;
+      final hasProfile = appProvider.profile != null;
       final currentPath = state.matchedLocation;
 
       if (!isAuthenticated) {
@@ -53,12 +57,20 @@ GoRouter createRouter(AppProvider appProvider) {
         return '/auth';
       }
 
+      // If profile hasn't loaded yet, don't redirect (avoid kicking to pending before data arrives)
+      if (hasProfile && !isApproved) {
+        if (currentPath == '/pending-approval') return null;
+        return '/pending-approval';
+      }
+
       if (!hasOnboarded) {
         if (currentPath == '/onboarding') return null;
         return '/onboarding';
       }
 
-      if (currentPath == '/auth' || currentPath == '/onboarding') {
+      if (currentPath == '/auth' ||
+          currentPath == '/onboarding' ||
+          currentPath == '/pending-approval') {
         return '/';
       }
 
@@ -69,6 +81,11 @@ GoRouter createRouter(AppProvider appProvider) {
       GoRoute(
         path: '/auth',
         builder: (context, state) => const AuthScreen(),
+      ),
+      // Pending approval
+      GoRoute(
+        path: '/pending-approval',
+        builder: (context, state) => const PendingApprovalScreen(),
       ),
       // Onboarding
       GoRoute(
@@ -234,6 +251,11 @@ GoRouter createRouter(AppProvider appProvider) {
         path: '/materials',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const MaterialsScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const NotificationsScreen(),
       ),
       // Main shell with bottom nav (5 tabs)
       ShellRoute(
