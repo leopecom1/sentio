@@ -165,6 +165,8 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
   }
 
   IconData get _toolIcon {
+    final custom = _tool['icon'] as IconData?;
+    if (custom != null) return custom;
     switch (_tool['category'] as String) {
       case 'breathing': return Icons.air_rounded;
       case 'pause': return Icons.pause_circle_outline_rounded;
@@ -172,6 +174,26 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
       case 'entrepreneur': return Icons.rocket_launch_outlined;
       default: return Icons.spa_outlined;
     }
+  }
+
+  List<Map<String, dynamic>> get _toolSteps {
+    final raw = _tool['steps'] as List?;
+    if (raw == null) return const [];
+    return raw.cast<Map<String, dynamic>>();
+  }
+
+  int get _currentStepIndex {
+    final steps = _toolSteps;
+    if (steps.isEmpty) return 0;
+    final totalTimed = steps.fold<int>(0, (a, s) => a + ((s['seconds'] as int?) ?? 0));
+    if (totalTimed <= 0) return 0;
+    final elapsed = (_tool['durationSeconds'] as int) - _remainingSeconds;
+    int acc = 0;
+    for (int i = 0; i < steps.length; i++) {
+      acc += (steps[i]['seconds'] as int?) ?? 0;
+      if (elapsed < acc) return i;
+    }
+    return steps.length - 1;
   }
 
   void _start() {
@@ -413,9 +435,12 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
                       position: _entrySlide,
                       child: FadeTransition(
                         opacity: _entryFade,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(height: 8),
                             // Animated icon with glow
                             AnimatedBuilder(
                               animation: _glowController,
@@ -483,20 +508,26 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 20),
                               child: Text(
-                                _tool['description'],
+                                (_tool['intro'] as String?) ?? _tool['description'],
                                 style: GoogleFonts.manrope(
-                                  fontSize: 15,
+                                  fontSize: 14,
                                   color: SentioColors.textSecondary,
                                   height: 1.5,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
                             ),
+                            if (_toolSteps.isNotEmpty) ...[
+                              const SizedBox(height: 24),
+                              _buildStepsPreview(color),
+                            ],
                             if (_isBreathing && _breathConfig != null) ...[
-                              const SizedBox(height: 28),
+                              const SizedBox(height: 20),
                               _buildPatternChips(color),
                             ],
-                          ],
+                              const SizedBox(height: 8),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -553,6 +584,83 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepsPreview(Color color) {
+    final steps = _toolSteps;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: SentioColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.list_alt_rounded, color: color, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                'QUÉ VAS A HACER',
+                style: GoogleFonts.manrope(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...List.generate(steps.length, (i) {
+            final step = steps[i];
+            final isLast = i == steps.length - 1;
+            return Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    margin: const EdgeInsets.only(top: 1),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: color.withValues(alpha: 0.3)),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${i + 1}',
+                        style: GoogleFonts.manrope(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      step['text'] as String,
+                      style: GoogleFonts.manrope(
+                        fontSize: 13,
+                        color: SentioColors.textPrimary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -735,6 +843,11 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
   }
 
   Widget _buildNonBreathingActive(Color color) {
+    final steps = _toolSteps;
+    final hasTimedSteps = steps.any((s) => ((s['seconds'] as int?) ?? 0) > 0);
+    final stepIdx = hasTimedSteps ? _currentStepIndex : 0;
+    final currentStep = steps.isNotEmpty ? steps[stepIdx] : null;
+
     return AnimatedBuilder(
       animation: _glowController,
       builder: (context, _) {
@@ -742,9 +855,47 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Step indicator pill
+            if (currentStep != null && hasTimedSteps)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: SentioColors.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Paso ',
+                      style: GoogleFonts.manrope(
+                        fontSize: 12,
+                        color: SentioColors.textTertiary,
+                      ),
+                    ),
+                    Text(
+                      '${stepIdx + 1}',
+                      style: GoogleFonts.manrope(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      ' / ${steps.length}',
+                      style: GoogleFonts.manrope(
+                        fontSize: 12,
+                        color: SentioColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (currentStep != null && hasTimedSteps) const SizedBox(height: 24),
             Container(
-              width: 200,
-              height: 200,
+              width: 180,
+              height: 180,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
@@ -765,8 +916,8 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
               ),
               child: Center(
                 child: Container(
-                  width: 110,
-                  height: 110,
+                  width: 96,
+                  height: 96,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
@@ -779,23 +930,37 @@ class _ToolDetailScreenState extends State<ToolDetailScreen>
                     ),
                     border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
                   ),
-                  child: Icon(_toolIcon, color: color, size: 56),
+                  child: Icon(_toolIcon, color: color, size: 48),
                 ),
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 36),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                _tool['description'],
-                style: GoogleFonts.manrope(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w600,
-                  color: SentioColors.textPrimary,
-                  height: 1.5,
-                  letterSpacing: -0.3,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: Tween(
+                      begin: const Offset(0, 0.15),
+                      end: Offset.zero,
+                    ).animate(anim),
+                    child: child,
+                  ),
                 ),
-                textAlign: TextAlign.center,
+                child: Text(
+                  (currentStep?['text'] as String?) ?? _tool['description'],
+                  key: ValueKey(stepIdx),
+                  style: GoogleFonts.manrope(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: SentioColors.textPrimary,
+                    height: 1.4,
+                    letterSpacing: -0.3,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
           ],

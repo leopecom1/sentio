@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -71,44 +72,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     HapticFeedback.selectionClick();
     showModalBottomSheet(
       context: context,
-      backgroundColor: SentioColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: SentioColors.divider,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: SentioColors.textPrimary),
-                title: Text('Tomar foto', style: GoogleFonts.manrope(color: SentioColors.textPrimary)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickAndUploadAvatar(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: SentioColors.textPrimary),
-                title: Text('Elegir de galería', style: GoogleFonts.manrope(color: SentioColors.textPrimary)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickAndUploadAvatar(ImageSource.gallery);
-                },
-              ),
-            ],
-          ),
-        ),
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (ctx) => _AvatarSourceSheet(
+        onCamera: () {
+          Navigator.pop(ctx);
+          _pickAndUploadAvatar(ImageSource.camera);
+        },
+        onGallery: () {
+          Navigator.pop(ctx);
+          _pickAndUploadAvatar(ImageSource.gallery);
+        },
       ),
     );
   }
@@ -400,26 +376,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: SentioColors.textPrimary,
                 letterSpacing: -0.3,
               ),
-            ),
-          ),
-        ),
-        // Settings gear button
-        GestureDetector(
-          onTap: () {
-            // Settings action
-          },
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: SentioColors.surface,
-              border: Border.all(color: SentioColors.border),
-            ),
-            child: const Icon(
-              Icons.settings_rounded,
-              color: SentioColors.textPrimary,
-              size: 20,
             ),
           ),
         ),
@@ -1317,6 +1273,193 @@ class _B2BetterBanner extends StatelessWidget {
               color: SentioColors.primary,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AvatarSourceSheet extends StatelessWidget {
+  final VoidCallback onCamera;
+  final VoidCallback onGallery;
+
+  const _AvatarSourceSheet({
+    required this.onCamera,
+    required this.onGallery,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 20 + bottomInset),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: SentioColors.surface.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  blurRadius: 40,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Text(
+                  'Cambiar foto',
+                  style: GoogleFonts.manrope(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: SentioColors.textPrimary,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Elegí cómo querés subir tu imagen',
+                  style: GoogleFonts.manrope(
+                    fontSize: 13,
+                    color: SentioColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _SheetAction(
+                  icon: Icons.camera_alt_rounded,
+                  title: 'Tomar foto',
+                  subtitle: 'Usar la cámara',
+                  onTap: onCamera,
+                  accent: SentioColors.accent,
+                ),
+                const SizedBox(height: 10),
+                _SheetAction(
+                  icon: Icons.photo_library_rounded,
+                  title: 'Elegir de galería',
+                  subtitle: 'Buscar en tu dispositivo',
+                  onTap: onGallery,
+                  accent: SentioColors.primary,
+                ),
+                const SizedBox(height: 14),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    minimumSize: const Size(double.infinity, 48),
+                    backgroundColor: Colors.white.withValues(alpha: 0.04),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    'Cancelar',
+                    style: GoogleFonts.manrope(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: SentioColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetAction extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Color accent;
+
+  const _SheetAction({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: accent.withValues(alpha: 0.25)),
+                ),
+                child: Icon(icon, color: accent, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.manrope(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: SentioColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.manrope(
+                        fontSize: 12,
+                        color: SentioColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 13,
+                color: SentioColors.textTertiary,
+              ),
+            ],
+          ),
         ),
       ),
     );

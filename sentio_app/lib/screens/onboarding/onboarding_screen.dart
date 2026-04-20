@@ -47,7 +47,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_completing) return;
     final provider = context.read<AppProvider>();
 
+    // Not authenticated yet: cache selections locally and go to auth
     if (!provider.isAuthenticated) {
+      await provider.markWizardSeen(
+        pressureTypes: _selectedPressures,
+        currentMood: _selectedMood.isEmpty ? 'calm' : _selectedMood,
+        energy: _energy,
+        goals: _selectedGoals,
+      );
+      if (!mounted) return;
       context.go('/auth');
       return;
     }
@@ -72,6 +80,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _skipToAuth() async {
+    final provider = context.read<AppProvider>();
+    await provider.markWizardSeen();
+    if (!mounted) return;
+    context.go('/auth?mode=login');
   }
 
   @override
@@ -207,7 +222,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 16),
           TextButton(
-            onPressed: () => context.go('/auth'),
+            onPressed: _skipToAuth,
             child: const Text(
               'Ya tengo cuenta',
               style: TextStyle(color: SentioColors.textSecondary),
@@ -358,9 +373,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(
-                                emotion['emoji'],
-                                style: const TextStyle(fontSize: 28),
+                              Icon(
+                                SentioConstants.getEmotionIcon(emotion['id'] as String),
+                                size: 32,
+                                color: isSelected
+                                    ? Color(emotion['color'] as int)
+                                    : SentioColors.textSecondary,
                               ),
                               const SizedBox(height: 6),
                               Text(

@@ -99,6 +99,50 @@ class AppProvider extends ChangeNotifier {
   String get dailyPhrase => _dailyPhrase;
   bool get hasCompletedOnboarding => _profile?.onboardingCompleted ?? false;
   bool get isApproved => _profile?.isApproved ?? false;
+  // Wizard-seen is in-memory only: resets on every cold start so the wizard
+  // shows again if the user isn't logged in.
+  bool _wizardSeen = false;
+  bool get wizardSeen => _wizardSeen;
+
+  Future<void> markWizardSeen({
+    List<String>? pressureTypes,
+    String? currentMood,
+    int? energy,
+    List<String>? goals,
+  }) async {
+    _wizardSeen = true;
+    if (pressureTypes != null || currentMood != null || energy != null || goals != null) {
+      final prefs = await SharedPreferences.getInstance();
+      if (pressureTypes != null) await prefs.setStringList('pending_pressures', pressureTypes);
+      if (currentMood != null) await prefs.setString('pending_mood', currentMood);
+      if (energy != null) await prefs.setInt('pending_energy', energy);
+      if (goals != null) await prefs.setStringList('pending_goals', goals);
+    }
+    notifyListeners();
+  }
+
+  Future<void> applyPendingOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pressures = prefs.getStringList('pending_pressures');
+    final mood = prefs.getString('pending_mood');
+    final energy = prefs.getInt('pending_energy');
+    final goals = prefs.getStringList('pending_goals');
+    if (pressures == null && mood == null && energy == null && goals == null) return;
+    try {
+      await completeOnboarding(
+        pressureTypes: pressures ?? const [],
+        currentMood: mood ?? 'calm',
+        energy: energy ?? 5,
+        goals: goals ?? const [],
+      );
+      await prefs.remove('pending_pressures');
+      await prefs.remove('pending_mood');
+      await prefs.remove('pending_energy');
+      await prefs.remove('pending_goals');
+    } catch (e) {
+      debugPrint('applyPendingOnboarding failed: $e');
+    }
+  }
   String get userName => _profile?.firstName ?? 'amigo';
   List<Map<String, dynamic>> get articles => _articles;
   List<Map<String, dynamic>> get routines => _routines;
@@ -612,6 +656,7 @@ class AppProvider extends ChangeNotifier {
       if (response.user != null) {
         _isAuthenticated = true;
         await _loadUserData();
+        await applyPendingOnboarding();
       }
     } catch (e) {
       rethrow;
@@ -631,6 +676,7 @@ class AppProvider extends ChangeNotifier {
       if (response.user != null) {
         _isAuthenticated = true;
         await _loadUserData();
+        await applyPendingOnboarding();
       }
     } catch (e) {
       rethrow;

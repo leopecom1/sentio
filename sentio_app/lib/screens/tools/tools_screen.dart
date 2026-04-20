@@ -178,7 +178,7 @@ class _ToolsScreenState extends State<ToolsScreen> {
                     itemBuilder: (context, index) {
                       final tool = filteredTools[index];
                   final color = _getCategoryColor(tool['category']);
-                  final icon = _getCategoryIcon(tool['category']);
+                  final icon = (tool['icon'] as IconData?) ?? _getCategoryIcon(tool['category']);
 
                   return GestureDetector(
                     onTap: () => context.push('/tool/${tool['id']}'),
@@ -308,7 +308,7 @@ class _ToolsScreenState extends State<ToolsScreen> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 30),
+              child: Icon((tool['icon'] as IconData?) ?? Icons.psychology_rounded, color: Colors.white, size: 30),
             ),
             const SizedBox(width: 16),
             Expanded(

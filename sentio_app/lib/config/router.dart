@@ -48,16 +48,26 @@ GoRouter createRouter(AppProvider appProvider) {
     redirect: (context, state) {
       final isAuthenticated = appProvider.isAuthenticated;
       final hasOnboarded = appProvider.hasCompletedOnboarding;
+      final wizardSeen = appProvider.wizardSeen;
       final isApproved = appProvider.isApproved;
       final hasProfile = appProvider.profile != null;
       final currentPath = state.matchedLocation;
 
+      // Always allow legal pages
+      if (currentPath == '/legal/terms' || currentPath == '/legal/privacy') {
+        return null;
+      }
+
       if (!isAuthenticated) {
+        // Show wizard first the very first time
+        if (!wizardSeen) {
+          if (currentPath == '/onboarding') return null;
+          return '/onboarding';
+        }
         if (currentPath == '/auth') return null;
         return '/auth';
       }
 
-      // If profile hasn't loaded yet, don't redirect (avoid kicking to pending before data arrives)
       if (hasProfile && !isApproved) {
         if (currentPath == '/pending-approval') return null;
         return '/pending-approval';

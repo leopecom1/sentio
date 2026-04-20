@@ -14,7 +14,7 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
-  bool _isLogin = true;
+  bool _isLogin = false;
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -29,6 +29,12 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final mode = GoRouterState.of(context).uri.queryParameters['mode'];
+      if (mode == 'login' && mounted) {
+        setState(() => _isLogin = true);
+      }
+    });
   }
 
   @override
