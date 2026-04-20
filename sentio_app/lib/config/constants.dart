@@ -5,8 +5,8 @@ class SentioConstants {
   static const String tagline = 'Tu espacio para sentir, entender y avanzar.';
 
   // Supabase
-  static const String supabaseUrl = 'https://guwltpbbvgedopeqcuvz.supabase.co';
-  static const String supabaseAnonKey = 'sb_publishable_CQPGU6ycM6qzzC8D766fdw_UIEAon-P';
+  static const String supabaseUrl = 'https://supabase-b2better-app-supabase-b2better-app.b3uer4.easypanel.host';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzEzMTk2MDAwLCJleHAiOjIwMjg3MzA2MDB9.Fi1nuUn5TI9ZNY_CdZEDtDPmxWrsk653hfK82ss3AhQ';
 
   // OpenAI
   static const String openaiApiKey = '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';
