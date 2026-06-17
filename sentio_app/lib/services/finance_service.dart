@@ -1,9 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:sentio_app/config/constants.dart';
 import 'package:sentio_app/config/finance_constants.dart';
 import 'package:sentio_app/models/financial_account.dart';
 import 'package:sentio_app/models/financial_transaction.dart';
@@ -284,13 +282,8 @@ class FinanceService {
           .map((c) => c['id'] as String)
           .join(', ');
 
-      final response = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${SentioConstants.openaiApiKey}',
-        },
-        body: jsonEncode({
+      final data = await _supabase.rpc('ai_proxy', params: {
+        'p_payload': {
           'model': 'gpt-4o-mini',
           'messages': [
             {
@@ -324,13 +317,11 @@ Si es un ticket argentino, la moneda es ARS por defecto.''',
           ],
           'max_tokens': 200,
           'temperature': 0.1,
-        }),
-      );
+        },
+      });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['choices'][0]['message']['content'] as String;
-
+      final content = data?['choices']?[0]?['message']?['content'];
+      if (content is String && content.trim().isNotEmpty) {
         // Parse JSON from response (handle markdown code blocks)
         String jsonStr = content;
         if (content.contains('```')) {
@@ -339,12 +330,10 @@ Si es un ticket argentino, la moneda es ARS por defecto.''',
               .replaceAll(RegExp(r'```\s*'), '')
               .trim();
         }
-
         return jsonDecode(jsonStr) as Map<String, dynamic>;
-      } else {
-        debugPrint('OCR error: ${response.statusCode} - ${response.body}');
-        return null;
       }
+      debugPrint('OCR proxy returned no content: $data');
+      return null;
     } catch (e) {
       debugPrint('OCR request failed: $e');
       return null;
@@ -395,13 +384,8 @@ Priorizá la contención emocional sobre los números. Sé empático y evitá se
         emotionalNote = 'Estado emocional reciente del usuario: $emotionalContext.';
       }
 
-      final response = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${SentioConstants.openaiApiKey}',
-        },
-        body: jsonEncode({
+      final data = await _supabase.rpc('ai_proxy', params: {
+        'p_payload': {
           'model': 'gpt-4o-mini',
           'messages': [
             {
@@ -428,16 +412,15 @@ Dame un consejo financiero personalizado basado en estos datos.''',
           ],
           'max_tokens': 250,
           'temperature': 0.7,
-        }),
-      );
+        },
+      });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['choices'][0]['message']['content'] as String;
-      } else {
-        debugPrint('Advisor error: ${response.statusCode}');
-        return _getFallbackAdvice(totalIncome, totalExpenses);
+      final content = data?['choices']?[0]?['message']?['content'];
+      if (content is String && content.trim().isNotEmpty) {
+        return content;
       }
+      debugPrint('Advisor proxy returned no content: $data');
+      return _getFallbackAdvice(totalIncome, totalExpenses);
     } catch (e) {
       debugPrint('Advisor request failed: $e');
       return _getFallbackAdvice(0, 0);

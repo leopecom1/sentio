@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sentio_app/config/theme.dart';
 import 'package:sentio_app/config/constants.dart';
 import 'package:sentio_app/providers/app_provider.dart';
@@ -18,6 +19,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   bool _isSending = false;
 
+  static const String _consentKey = 'chat_ai_consent_v1';
+
   @override
   void initState() {
     super.initState();
@@ -26,7 +29,103 @@ class _ChatScreenState extends State<ChatScreen> {
       if (provider.currentMessages.isEmpty) {
         provider.startNewConversation();
       }
+      _ensureConsent();
     });
+  }
+
+  /// Shows a one-time consent dialog before the user can use the AI chat.
+  /// If the user declines, we leave the screen. Acceptance is persisted.
+  Future<void> _ensureConsent() async {
+    final prefs = await SharedPreferences.getInstance();
+    final accepted = prefs.getBool(_consentKey) ?? false;
+    if (accepted) return;
+    if (!mounted) return;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SentioColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: SentioColors.primary.withOpacity(0.15),
+              ),
+              child: const Icon(
+                Icons.smart_toy_rounded,
+                color: SentioColors.primary,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Asistente de IA',
+                style: GoogleFonts.manrope(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: SentioColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Este chat usa inteligencia artificial para generar respuestas '
+          'automáticas. No es un profesional de la salud ni reemplaza '
+          'atención médica, psicológica o financiera.\n\n'
+          'Tus mensajes se envían a un proveedor de IA para generar las '
+          'respuestas. No compartas información sensible que no quieras '
+          'procesar.\n\n'
+          'Si estás en crisis o emergencia, contactá a un profesional o a '
+          'los servicios de emergencia de tu país.',
+          style: GoogleFonts.manrope(
+            fontSize: 14,
+            height: 1.5,
+            color: SentioColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'No, gracias',
+              style: GoogleFonts.manrope(
+                fontWeight: FontWeight.w600,
+                color: SentioColors.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SentioColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Acepto y continúo',
+              style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await prefs.setBool(_consentKey, true);
+    } else {
+      if (mounted) context.pop();
+    }
   }
 
   @override
@@ -144,6 +243,8 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 // ─── Header ───
                 _buildHeader(provider),
+                // ─── AI disclaimer banner ───
+                _buildDisclaimerBanner(),
                 // ─── Focus Area Cards ───
                 _buildFocusCards(todayCheckin?.primaryEmotion, profile?.goals ?? []),
                 // ─── Divider ───
@@ -209,7 +310,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           const SizedBox(width: 10),
-          // Coach avatar
+          // AI assistant avatar
           Container(
             width: 42,
             height: 42,
@@ -222,19 +323,19 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             child: const Icon(
-              Icons.psychology_rounded,
+              Icons.smart_toy_rounded,
               color: SentioColors.primary,
               size: 22,
             ),
           ),
           const SizedBox(width: 12),
-          // Title + online indicator
+          // Title + AI label
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Coach Alex',
+                  'Asistente IA',
                   style: GoogleFonts.manrope(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -245,11 +346,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    // Animated ping dot
-                    _OnlineDot(),
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 12,
+                      color: SentioColors.textSecondary,
+                    ),
                     const SizedBox(width: 6),
                     Text(
-                      'En línea ahora',
+                      'Respuestas generadas por IA',
                       style: GoogleFonts.manrope(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -260,13 +364,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
             ),
-          ),
-          // More button
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_vert_rounded, size: 22),
-            color: SentioColors.textSecondary,
-            splashRadius: 20,
           ),
           // New conversation button
           GestureDetector(
@@ -287,6 +384,43 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           const SizedBox(width: 4),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  //  AI DISCLAIMER BANNER
+  // ═══════════════════════════════════════════
+  Widget _buildDisclaimerBanner() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: SentioColors.primary.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: SentioColors.primary.withOpacity(0.15)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 14,
+            color: SentioColors.textSecondary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Respuestas generadas por IA. No reemplaza atención profesional.',
+              style: GoogleFonts.manrope(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                height: 1.3,
+                color: SentioColors.textSecondary,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -570,15 +704,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           child: Row(
             children: [
-              // Attach button
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.attach_file_rounded, size: 20),
-                color: SentioColors.textSecondary,
-                splashRadius: 18,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              ),
+              const SizedBox(width: 12),
               // TextField
               Expanded(
                 child: TextField(
@@ -602,15 +728,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   onSubmitted: (_) => _send(),
                 ),
-              ),
-              // Mic button
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.mic_none_rounded, size: 20),
-                color: SentioColors.textSecondary,
-                splashRadius: 18,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               ),
               // Send button
               GestureDetector(
@@ -687,82 +804,6 @@ class _FocusCard extends StatelessWidget {
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════
-//  ONLINE INDICATOR DOT (animated ping)
-// ═══════════════════════════════════════════════
-class _OnlineDot extends StatefulWidget {
-  @override
-  State<_OnlineDot> createState() => _OnlineDotState();
-}
-
-class _OnlineDotState extends State<_OnlineDot>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _opacityAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    )..repeat();
-    _scaleAnimation = Tween(begin: 1.0, end: 2.5).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-    _opacityAnimation = Tween(begin: 0.6, end: 0.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 12,
-      height: 12,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Ping ring
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (_, __) => Transform.scale(
-              scale: _scaleAnimation.value,
-              child: Opacity(
-                opacity: _opacityAnimation.value,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: SentioColors.accent,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Solid dot
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: SentioColors.accent,
-            ),
           ),
         ],
       ),

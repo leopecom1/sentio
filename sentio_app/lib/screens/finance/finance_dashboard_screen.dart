@@ -201,9 +201,9 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: _buildMiniStat('Ingresos', income, currency, const Color(0xFF4CAF50))),
+                Expanded(child: _buildMiniStat('Ingresos (mes)', income, currency, const Color(0xFF4CAF50))),
                 Container(width: 1, height: 28, color: SentioColors.divider),
-                Expanded(child: _buildMiniStat('Gastos', expenses, currency, SentioColors.error)),
+                Expanded(child: _buildMiniStat('Gastos (mes)', expenses, currency, SentioColors.error)),
               ],
             ),
           ],

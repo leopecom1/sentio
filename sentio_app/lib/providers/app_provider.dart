@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:sentio_app/config/constants.dart';
 import 'package:sentio_app/models/profile.dart';
 import 'package:sentio_app/models/checkin.dart';
 import 'package:sentio_app/models/journal_entry.dart';
@@ -54,6 +53,10 @@ class AppProvider extends ChangeNotifier {
   String? _currentConversationId;
   bool _isLoading = false;
   bool _isAuthenticated = false;
+  // Forced update: si la versión instalada es menor que el mínimo remoto,
+  // la app muestra una pantalla bloqueante con botón a la tienda.
+  bool _forceUpdateRequired = false;
+  String? _forceUpdateStoreUrl;
   Checkin? _todayCheckin;
   String _dailyPhrase = '';
   List<Map<String, dynamic>> _articles = [];
@@ -66,6 +69,7 @@ class AppProvider extends ChangeNotifier {
   List<CommunityComment> _postComments = [];
   final Set<String> _likedPostIds = {};
   final Set<String> _followedUserIds = {};
+  final Set<String> _blockedUserIds = {};
 
   // Finance
   List<FinancialAccount> _financialAccounts = [];
@@ -95,6 +99,8 @@ class AppProvider extends ChangeNotifier {
   String? get currentConversationId => _currentConversationId;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _isAuthenticated;
+  bool get forceUpdateRequired => _forceUpdateRequired;
+  String? get forceUpdateStoreUrl => _forceUpdateStoreUrl;
   Checkin? get todayCheckin => _todayCheckin;
   String get dailyPhrase => _dailyPhrase;
   bool get hasCompletedOnboarding => _profile?.onboardingCompleted ?? false;
@@ -441,8 +447,66 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ============ FORCED UPDATE ============
+  /// Compara dos versiones semánticas ("1.2.3"). Ignora el build (+N).
+  /// Devuelve negativo si a es menor que b, 0 si son iguales, positivo si mayor.
+  int _compareVersions(String a, String b) {
+    List<int> parts(String v) => v
+        .split('+')
+        .first
+        .trim()
+        .split('.')
+        .map((e) => int.tryParse(e.trim()) ?? 0)
+        .toList();
+    final pa = parts(a), pb = parts(b);
+    for (var i = 0; i < 3; i++) {
+      final x = i < pa.length ? pa[i] : 0;
+      final y = i < pb.length ? pb[i] : 0;
+      if (x != y) return x.compareTo(y);
+    }
+    return 0;
+  }
+
+  /// Chequea contra `app_config` si la versión instalada quedó por debajo del
+  /// mínimo soportado. Fail-open: ante cualquier error (sin red, etc.) NO
+  /// bloquea, para no dejar a nadie afuera por un problema transitorio.
+  Future<void> _checkForceUpdate() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final current = info.version; // ej. "1.0.0"
+      final minKey = Platform.isIOS ? 'min_ios_version' : 'min_android_version';
+      final urlKey = Platform.isIOS ? 'ios_store_url' : 'android_store_url';
+
+      final rows = await _supabase
+          .from('app_config')
+          .select('key, value')
+          .inFilter('key', [minKey, urlKey]);
+
+      String? minVersion;
+      String? storeUrl;
+      for (final r in rows as List) {
+        if (r['key'] == minKey) minVersion = r['value'] as String?;
+        if (r['key'] == urlKey) storeUrl = r['value'] as String?;
+      }
+
+      if (minVersion != null &&
+          minVersion.trim().isNotEmpty &&
+          _compareVersions(current, minVersion) < 0) {
+        _forceUpdateRequired = true;
+        _forceUpdateStoreUrl = storeUrl;
+        notifyListeners();
+      }
+    } catch (e) {
+      // Fail-open: no bloqueamos si no se pudo verificar.
+      debugPrint('Force-update check skipped: $e');
+    }
+  }
+
   // ============ INIT ============
   Future<void> initialize() async {
+    // Antes que nada: ¿hay que forzar actualización?
+    await _checkForceUpdate();
+
     // Load celebrated achievements for current user (per-user scoped)
     await _loadCelebratedAchievements();
 
@@ -489,6 +553,7 @@ class AppProvider extends ChangeNotifier {
       _loadArticles(),
       _loadRoutines(),
       _loadFinancialData(),
+      loadBlockedUsers(),
     ]);
 
     _findTodayCheckin();
@@ -636,6 +701,7 @@ class AppProvider extends ChangeNotifier {
     _financialTransactions = [];
     _notifications = [];
     _unreadNotifications = 0;
+    _blockedUserIds.clear();
     _stopNotificationsPolling();
     _celebratedAchievementIds = {};
     // NOTE: do NOT delete 'celebrated_achievements_*' keys — they are per-user
@@ -689,6 +755,52 @@ class AppProvider extends ChangeNotifier {
     await _supabase.auth.signOut();
     _clearData();
     notifyListeners();
+  }
+
+  // ============ PASSWORD RESET (código de 6 dígitos por email) ============
+
+  /// Solicita el envío de un código de 6 dígitos al email indicado.
+  /// El backend (RPC `request_password_reset`) genera el código, lo guarda
+  /// hasheado y lo manda por Resend. Por privacidad, siempre responde OK,
+  /// exista o no el email.
+  Future<void> requestPasswordReset(String email) async {
+    await _supabase.rpc('request_password_reset', params: {
+      'p_email': email.trim().toLowerCase(),
+    });
+  }
+
+  /// Verifica el código de 6 dígitos y, si es válido, fija la nueva contraseña.
+  /// En éxito, deja al usuario logueado automáticamente con la nueva clave.
+  Future<void> verifyPasswordReset(
+    String email,
+    String code,
+    String newPassword,
+  ) async {
+    await _supabase.rpc('verify_password_reset', params: {
+      'p_email': email.trim().toLowerCase(),
+      'p_code': code.trim(),
+      'p_new_password': newPassword,
+    });
+    // La contraseña ya cambió en el backend: iniciamos sesión con ella.
+    await signIn(email.trim(), newPassword);
+  }
+
+  /// Elimina permanentemente la cuenta del usuario y todos sus datos.
+  /// (Requisito Apple 5.1.1(v) / Google Play). El borrado en el backend
+  /// cascadea desde auth.users hacia profiles y todas las tablas.
+  Future<bool> deleteAccount() async {
+    try {
+      await _supabase.rpc('delete_current_user');
+      try {
+        await _supabase.auth.signOut();
+      } catch (_) {/* la sesión puede invalidarse al borrar el usuario */}
+      _clearData();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting account: $e');
+      return false;
+    }
   }
 
   // ============ ONBOARDING ============
@@ -936,12 +1048,13 @@ class AppProvider extends ChangeNotifier {
       final messages = <Map<String, String>>[
         {
           'role': 'system',
-          'content': 'Sos un terapeuta emocional empático especializado en emprendedores. '
-              'Tu nombre es Sentio. Hablás en español rioplatense (vos, querés, sentís). '
-              'Sos cálido, genuino y directo. No das consejos genéricos. '
-              'Validás emociones antes de sugerir acciones. '
-              'Tus respuestas son concisas (2-4 oraciones máximo). '
-              'Nunca decís "como IA" ni rompés el personaje.',
+          'content': 'Sos un asistente conversacional de bienestar con inteligencia artificial, '
+              'especializado en acompañar a emprendedores. Hablás en español rioplatense '
+              '(vos, querés, sentís). Sos cálido, genuino y directo. Validás emociones antes '
+              'de sugerir acciones. Tus respuestas son concisas (2-4 oraciones máximo). '
+              'No sos un profesional de la salud mental y no das diagnósticos ni tratamientos; '
+              'si te preguntan, aclará con naturalidad que sos una IA. Ante señales de crisis o '
+              'riesgo, recomendá buscar ayuda profesional y usar el botón de apoyo de la app.',
         },
       ];
 
@@ -959,29 +1072,25 @@ class AppProvider extends ChangeNotifier {
       // Add the current message
       messages.add({'role': 'user', 'content': userMessage});
 
-      final response = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${SentioConstants.openaiApiKey}',
-        },
-        body: jsonEncode({
+      // La clave de OpenAI vive en el servidor (Supabase Vault). La app llama
+      // a la función `ai_proxy`, que reenvía la petición a OpenAI.
+      final data = await _supabase.rpc('ai_proxy', params: {
+        'p_payload': {
           'model': 'gpt-4o-mini',
           'messages': messages,
           'max_tokens': 300,
           'temperature': 0.8,
-        }),
-      );
+        },
+      });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['choices'][0]['message']['content'] as String;
-      } else {
-        debugPrint('OpenAI error: ${response.statusCode} - ${response.body}');
-        return _getFallbackResponse(userMessage);
+      final content = data?['choices']?[0]?['message']?['content'];
+      if (content is String && content.trim().isNotEmpty) {
+        return content;
       }
+      debugPrint('ai_proxy returned no content: $data');
+      return _getFallbackResponse(userMessage);
     } catch (e) {
-      debugPrint('OpenAI request failed: $e');
+      debugPrint('ai_proxy request failed: $e');
       return _getFallbackResponse(userMessage);
     }
   }
@@ -1462,9 +1571,11 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _loadCommunityPosts({String? category}) async {
     try {
-      _communityPosts = await _communityService.loadPosts(
+      final posts = await _communityService.loadPosts(
         category: category ?? _selectedCommunityCategory,
       );
+      _communityPosts =
+          posts.where((p) => !_blockedUserIds.contains(p.userId)).toList();
     } catch (e) {
       debugPrint('Error loading community posts: $e');
     }
@@ -1472,7 +1583,9 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _loadCommunityStories() async {
     try {
-      _communityStories = await _communityService.loadStories();
+      final stories = await _communityService.loadStories();
+      _communityStories =
+          stories.where((s) => !_blockedUserIds.contains(s.userId)).toList();
     } catch (e) {
       debugPrint('Error loading stories: $e');
     }
@@ -1480,15 +1593,18 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> refreshCommunityPosts({String? category, bool append = false}) async {
     if (!append) {
-      _communityPosts = await _communityService.loadPosts(
+      final posts = await _communityService.loadPosts(
         category: category ?? _selectedCommunityCategory,
       );
+      _communityPosts =
+          posts.where((p) => !_blockedUserIds.contains(p.userId)).toList();
     } else {
       final more = await _communityService.loadPosts(
         category: category ?? _selectedCommunityCategory,
         offset: _communityPosts.length,
       );
-      _communityPosts.addAll(more);
+      _communityPosts
+          .addAll(more.where((p) => !_blockedUserIds.contains(p.userId)));
     }
     notifyListeners();
   }
@@ -1567,6 +1683,87 @@ class AppProvider extends ChangeNotifier {
     if (post != null) {
       _communityPosts.insert(0, post);
       notifyListeners();
+    }
+  }
+
+  // ── Moderación de contenido (Apple 1.2 - UGC) ──
+  Set<String> get blockedUserIds => _blockedUserIds;
+  bool isUserBlocked(String userId) => _blockedUserIds.contains(userId);
+
+  Future<void> loadBlockedUsers() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final data = await _supabase
+          .from('blocked_users')
+          .select('blocked_id')
+          .eq('blocker_id', userId);
+      _blockedUserIds
+        ..clear()
+        ..addAll((data as List).map((e) => e['blocked_id'] as String));
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading blocked users: $e');
+    }
+  }
+
+  Future<bool> blockUser(String blockedUserId) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null || blockedUserId == userId) return false;
+    try {
+      await _supabase.from('blocked_users').insert({
+        'blocker_id': userId,
+        'blocked_id': blockedUserId,
+      });
+      _blockedUserIds.add(blockedUserId);
+      // Quitar de las vistas en memoria el contenido del usuario bloqueado.
+      _communityPosts.removeWhere((p) => p.userId == blockedUserId);
+      _communityStories.removeWhere((s) => s.userId == blockedUserId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error blocking user: $e');
+      return false;
+    }
+  }
+
+  Future<bool> unblockUser(String blockedUserId) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return false;
+    try {
+      await _supabase
+          .from('blocked_users')
+          .delete()
+          .eq('blocker_id', userId)
+          .eq('blocked_id', blockedUserId);
+      _blockedUserIds.remove(blockedUserId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error unblocking user: $e');
+      return false;
+    }
+  }
+
+  /// Reporta contenido. contentType: 'post' | 'comment' | 'story' | 'user'.
+  Future<bool> reportContent({
+    required String contentType,
+    required String contentId,
+    String? reason,
+  }) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return false;
+    try {
+      await _supabase.from('content_reports').insert({
+        'reporter_id': userId,
+        'content_type': contentType,
+        'content_id': contentId,
+        'reason': reason,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error reporting content: $e');
+      return false;
     }
   }
 

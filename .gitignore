@@ -6,3 +6,12 @@
 node_modules/
 supabase/.temp/
 landing/
+
+# Landing es su propio repo (b2better-app-landing.git) — no embeber en el principal
+b2better-app-landing/
+isotipoylogotipoensvgdeb2better/
+
+# Artefactos temporales / secretos locales
+.playwright-mcp/
+sentio_admin/.env
+**/AuthKey_*.p8

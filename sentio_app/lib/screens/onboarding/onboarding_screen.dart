@@ -160,6 +160,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // ============ PAGE 1: Welcome ============
   Widget _buildWelcomePage() {
+    // Si el usuario ya está autenticado (p. ej. recién creó la cuenta), el
+    // wizard solo sirve para completar su perfil: los botones de cuenta no
+    // aplican y, de hecho, generan un loop ("Ya tengo cuenta" → login →
+    // vuelve al wizard porque onboarding_completed sigue en false).
+    final isAuthenticated = context.watch<AppProvider>().isAuthenticated;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -220,14 +225,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             onPressed: _nextPage,
             child: const Text('Empezar'),
           ),
-          const SizedBox(height: 16),
-          TextButton(
-            onPressed: _skipToAuth,
-            child: const Text(
-              'Ya tengo cuenta',
-              style: TextStyle(color: SentioColors.textSecondary),
+          if (!isAuthenticated) ...[
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: _skipToAuth,
+              child: const Text(
+                'Ya tengo cuenta',
+                style: TextStyle(color: SentioColors.textSecondary),
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 24),
         ],
       ),

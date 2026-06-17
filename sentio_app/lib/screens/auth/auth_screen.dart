@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sentio_app/config/theme.dart';
 import 'package:sentio_app/providers/app_provider.dart';
 
@@ -46,19 +47,71 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: SentioColors.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// Traduce los errores de Supabase Auth a mensajes claros en español.
+  String _friendlyAuthError(Object error) {
+    if (error is AuthException) {
+      final code = error.code;
+      final msg = error.message.toLowerCase();
+      if (code == 'user_already_exists' ||
+          msg.contains('already registered') ||
+          msg.contains('already been registered')) {
+        return 'Este correo ya está registrado. Iniciá sesión.';
+      }
+      if (code == 'invalid_credentials' ||
+          msg.contains('invalid login credentials')) {
+        return 'Email o contraseña incorrectos.';
+      }
+      if (code == 'weak_password' || msg.contains('password should be')) {
+        return 'La contraseña es muy débil. Usá al menos 6 caracteres.';
+      }
+      if (code == 'validation_failed' || msg.contains('email')) {
+        return 'Revisá que el email sea válido.';
+      }
+      return error.message;
+    }
+    return 'Algo salió mal. Revisá tu conexión e intentá de nuevo.';
+  }
+
   Future<void> _submit() async {
     final provider = context.read<AppProvider>();
-    if (_isLogin) {
-      await provider.signIn(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
-    } else {
-      await provider.signUp(
-        _emailController.text.trim(),
-        _passwordController.text,
-        _nameController.text.trim(),
-      );
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final name = _nameController.text.trim();
+
+    // Validación básica antes de pegarle al backend.
+    if (email.isEmpty || !email.contains('@')) {
+      _showError('Ingresá un email válido.');
+      return;
+    }
+    if (password.length < 6) {
+      _showError('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (!_isLogin && name.isEmpty) {
+      _showError('Ingresá tu nombre.');
+      return;
+    }
+
+    try {
+      if (_isLogin) {
+        await provider.signIn(email, password);
+      } else {
+        await provider.signUp(email, password, name);
+      }
+    } catch (e) {
+      _showError(_friendlyAuthError(e));
+      return;
     }
 
     if (!mounted) return;
@@ -174,7 +227,18 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                           )
                         : Text(_isLogin ? 'Entrar' : 'Crear cuenta'),
                   ),
-                  const SizedBox(height: 16),
+                  // Forgot password (solo en login)
+                  if (_isLogin)
+                    Center(
+                      child: TextButton(
+                        onPressed: () => context.push('/forgot-password'),
+                        child: const Text(
+                          '¿Olvidaste tu contraseña?',
+                          style: TextStyle(color: SentioColors.textSecondary),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
                   // Toggle
                   Center(
                     child: TextButton(

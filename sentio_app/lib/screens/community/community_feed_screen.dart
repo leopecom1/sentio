@@ -41,6 +41,93 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     return '${(diff.inDays / 7).floor()}sem';
   }
 
+  /// Opens a reason picker and submits a report for a post.
+  Future<void> _reportPost(String postId) async {
+    final reasons = [
+      'Contenido inapropiado u ofensivo',
+      'Spam o engañoso',
+      'Acoso o discurso de odio',
+      'Contenido sexual o violento',
+      'Otro',
+    ];
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: SentioColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+              child: Text(
+                'Reportar publicación',
+                style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.w700, color: SentioColors.textPrimary),
+              ),
+            ),
+            ...reasons.map((r) => ListTile(
+                  title: Text(r, style: GoogleFonts.manrope(color: SentioColors.textPrimary)),
+                  onTap: () => Navigator.of(ctx).pop(r),
+                )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (reason == null || !mounted) return;
+    final ok = await context.read<AppProvider>().reportContent(
+          contentType: 'post',
+          contentId: postId,
+          reason: reason,
+        );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Gracias. Revisaremos el contenido reportado.'
+            : 'No se pudo enviar el reporte. Intentá de nuevo.'),
+      ),
+    );
+  }
+
+  /// Confirms and blocks a user.
+  Future<void> _confirmBlockUser(String userId, String userName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SentioColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Bloquear a $userName',
+            style: GoogleFonts.manrope(fontWeight: FontWeight.w700, color: SentioColors.textPrimary)),
+        content: Text(
+          'No volverás a ver sus publicaciones, historias ni comentarios. '
+          'Podés desbloquearlo más tarde desde tu perfil.',
+          style: GoogleFonts.manrope(color: SentioColors.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancelar', style: GoogleFonts.manrope(color: SentioColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: SentioColors.error, foregroundColor: Colors.white),
+            child: Text('Bloquear', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final ok = await context.read<AppProvider>().blockUser(userId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? '$userName fue bloqueado.' : 'No se pudo bloquear al usuario.')),
+    );
+  }
+
   // Map category names to colors for tags
   Color _categoryColor(String? category) {
     switch (category) {
@@ -572,14 +659,17 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // -- Post header: avatar + name + role tag + timestamp --
-            GestureDetector(
-              onTap: () => context.push('/community/user/${post.userId}'),
-              child: Row(
-                children: [
-                  _buildAvatar(post.userAvatar, post.userName, 40),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => context.push('/community/user/${post.userId}'),
+                    child: Row(
+                      children: [
+                        _buildAvatar(post.userAvatar, post.userName, 40),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
@@ -667,8 +757,45 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                       ],
                     ),
                   ),
-                ],
-              ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // -- Overflow menu: report / block --
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_horiz_rounded, color: SentioColors.textTertiary, size: 20),
+                  color: SentioColors.surface,
+                  onSelected: (value) {
+                    if (value == 'report') {
+                      _reportPost(post.id);
+                    } else if (value == 'block') {
+                      _confirmBlockUser(post.userId, post.userName);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'report',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.flag_outlined, size: 18, color: SentioColors.textSecondary),
+                          const SizedBox(width: 10),
+                          Text('Reportar', style: GoogleFonts.manrope(color: SentioColors.textPrimary)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'block',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.block_rounded, size: 18, color: SentioColors.error),
+                          const SizedBox(width: 10),
+                          Text('Bloquear', style: GoogleFonts.manrope(color: SentioColors.error)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
 
             // -- Content --

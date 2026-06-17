@@ -121,10 +121,14 @@ class Profile {
       validationSubmittedAt: json['validation_submitted_at'] != null
           ? DateTime.parse(json['validation_submitted_at'])
           : null,
-      isApproved: json['is_approved'] ?? false,
+      // La DB usa `validation_status` (no existe columna `is_approved`).
+      // Derivamos la aprobación de ese campo para que lectura y escritura coincidan.
+      isApproved: (json['is_approved'] ?? (json['validation_status'] == 'approved')) == true,
       approvedAt: json['approved_at'] != null
           ? DateTime.parse(json['approved_at'])
-          : null,
+          : (json['validation_reviewed_at'] != null
+              ? DateTime.parse(json['validation_reviewed_at'])
+              : null),
       email: json['email'],
       createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
     );

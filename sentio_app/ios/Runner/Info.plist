@@ -68,5 +68,13 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
+		<key>NSCameraUsageDescription</key>
+		<string>B2Better usa la cámara para que puedas tomar tu foto de perfil y escanear recibos de tus gastos.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>B2Better accede a tus fotos para que puedas elegir una foto de perfil o una imagen de recibo desde tu galería.</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>B2Better puede guardar imágenes en tu galería.</string>
 	</dict>
 </plist>

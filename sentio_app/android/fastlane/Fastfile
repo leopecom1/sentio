@@ -1,0 +1,27 @@
+default_platform(:android)
+
+AAB_PATH = "../build/app/outputs/bundle/release/app-release.aab"
+
+platform :android do
+  desc "Compila el App Bundle (.aab) de release con Flutter"
+  lane :build do
+    sh("cd ../.. && flutter build appbundle --release")
+  end
+
+  desc "Sube binario + metadata. Uso: fastlane android deploy track:internal"
+  lane :deploy do |options|
+    track = options[:track] || "internal"
+    build
+    upload_to_play_store(track: track, aab: AAB_PATH, skip_upload_apk: true)
+  end
+
+  desc "Sube SOLO la ficha de tienda (textos, capturas, changelog)"
+  lane :metadata do
+    upload_to_play_store(skip_upload_aab: true, skip_upload_apk: true)
+  end
+
+  desc "Descarga la metadata actual de Google Play al repo"
+  lane :pull_metadata do
+    download_from_play_store
+  end
+end

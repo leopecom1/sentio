@@ -1,0 +1,43 @@
+default_platform(:ios)
+
+def latest_ipa
+  Dir["../build/ios/ipa/*.ipa"].first || UI.user_error!("No se encontro el .ipa. Corre la lane build primero.")
+end
+
+API_KEY_PATH = ENV["APP_STORE_CONNECT_API_KEY_PATH"] || "fastlane/app_store_connect_api_key.json"
+
+platform :ios do
+  desc "Compila el IPA de release con Flutter"
+  lane :build do
+    sh("cd ../.. && flutter build ipa --release")
+  end
+
+  desc "Sube a TestFlight (beta)"
+  lane :beta do
+    build
+    upload_to_testflight(api_key_path: API_KEY_PATH, ipa: latest_ipa, skip_waiting_for_build_processing: true)
+  end
+
+  desc "Sube binario + metadata a App Store (borrador, sin enviar a revision)"
+  lane :deploy do
+    build
+    upload_to_app_store(
+      api_key_path: API_KEY_PATH, ipa: latest_ipa,
+      submit_for_review: false, automatic_release: false, force: true,
+      precheck_include_in_app_purchases: false, run_precheck_before_submit: false
+    )
+  end
+
+  desc "Sube SOLO la ficha de tienda"
+  lane :metadata do
+    upload_to_app_store(
+      api_key_path: API_KEY_PATH, skip_binary_upload: true,
+      submit_for_review: false, force: true, run_precheck_before_submit: false
+    )
+  end
+
+  desc "Descarga la metadata actual de App Store al repo"
+  lane :pull_metadata do
+    download_metadata(api_key_path: API_KEY_PATH)
+  end
+end

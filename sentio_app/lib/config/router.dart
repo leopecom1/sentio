@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentio_app/providers/app_provider.dart';
 import 'package:sentio_app/screens/auth/auth_screen.dart';
+import 'package:sentio_app/screens/auth/forgot_password_screen.dart';
 import 'package:sentio_app/screens/auth/pending_approval_screen.dart';
+import 'package:sentio_app/screens/force_update_screen.dart';
 import 'package:sentio_app/screens/onboarding/onboarding_screen.dart';
 import 'package:sentio_app/screens/home/home_screen.dart';
 import 'package:sentio_app/screens/checkin/checkin_screen.dart';
@@ -53,8 +55,19 @@ GoRouter createRouter(AppProvider appProvider) {
       final hasProfile = appProvider.profile != null;
       final currentPath = state.matchedLocation;
 
-      // Always allow legal pages
-      if (currentPath == '/legal/terms' || currentPath == '/legal/privacy') {
+      // Forced update: tiene prioridad sobre todo lo demás.
+      if (appProvider.forceUpdateRequired) {
+        return currentPath == '/force-update' ? null : '/force-update';
+      }
+      // Si no hay actualización obligatoria, nadie debería quedar atrapado acá.
+      if (currentPath == '/force-update') {
+        return '/';
+      }
+
+      // Always allow legal pages and the password-recovery flow
+      if (currentPath == '/legal/terms' ||
+          currentPath == '/legal/privacy' ||
+          currentPath == '/forgot-password') {
         return null;
       }
 
@@ -91,6 +104,14 @@ GoRouter createRouter(AppProvider appProvider) {
       GoRoute(
         path: '/auth',
         builder: (context, state) => const AuthScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/force-update',
+        builder: (context, state) => const ForceUpdateScreen(),
       ),
       // Pending approval
       GoRoute(

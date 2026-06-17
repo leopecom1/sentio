@@ -18,90 +18,54 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
   bool _started = false;
   bool _completed = false;
   int _currentQuestion = 0;
-  final Map<int, int> _answers = {}; // question index -> score 0-4
+  final Map<int, int> _answers = {}; // question index -> score 0-6
 
   late AnimationController _bgController;
   late AnimationController _entryController;
   late Animation<double> _entryFade;
   late Animation<Offset> _entrySlide;
 
-  // Questions (adapted from Maslach Burnout Inventory + scientific literature)
+  // Test de Burnout MBI (Maslach Burnout Inventory) adaptado a founders.
+  // 22 ítems en 3 dimensiones: Agotamiento Emocional (ae, 9), Despersonalización
+  // (dp, 5) y Realización Personal (rp, 8, dimensión positiva = invertida).
   static const List<Map<String, dynamic>> _questions = [
-    {
-      'text': 'Me siento emocionalmente agotado/a por mi trabajo',
-      'dimension': 'exhaustion',
-    },
-    {
-      'text': 'Me siento cansado/a cuando me levanto y tengo que enfrentar otro día',
-      'dimension': 'exhaustion',
-    },
-    {
-      'text': 'Trabajar todo el día con personas o problemas es realmente agotador',
-      'dimension': 'exhaustion',
-    },
-    {
-      'text': 'Me siento frustrado/a en mi trabajo',
-      'dimension': 'exhaustion',
-    },
-    {
-      'text': 'Siento que estoy trabajando demasiado',
-      'dimension': 'exhaustion',
-    },
-    {
-      'text': 'Me he vuelto más insensible con la gente desde que ejerzo este trabajo',
-      'dimension': 'cynicism',
-    },
-    {
-      'text': 'Me preocupa que este trabajo me esté endureciendo emocionalmente',
-      'dimension': 'cynicism',
-    },
-    {
-      'text': 'Realmente no me importa lo que les ocurra a las personas con las que trabajo',
-      'dimension': 'cynicism',
-    },
-    {
-      'text': 'Siento que las personas me culpan por sus problemas',
-      'dimension': 'cynicism',
-    },
-    {
-      'text': 'Puedo entender fácilmente lo que las personas a mi alrededor sienten',
-      'dimension': 'efficacy',
-      'reverse': true,
-    },
-    {
-      'text': 'Trato muy eficazmente los problemas de las personas con las que trabajo',
-      'dimension': 'efficacy',
-      'reverse': true,
-    },
-    {
-      'text': 'Siento que estoy influyendo positivamente en la vida de otras personas a través de mi trabajo',
-      'dimension': 'efficacy',
-      'reverse': true,
-    },
-    {
-      'text': 'Me siento con mucha vitalidad',
-      'dimension': 'efficacy',
-      'reverse': true,
-    },
-    {
-      'text': 'Me siento estimulado/a después de trabajar con la gente',
-      'dimension': 'efficacy',
-      'reverse': true,
-    },
-    {
-      'text': 'En mi trabajo trato los problemas emocionales con mucha calma',
-      'dimension': 'efficacy',
-      'reverse': true,
-    },
+    // ── AGOTAMIENTO EMOCIONAL (ae) ──
+    {'text': 'Me siento emocionalmente agotado/a por gestionar mi negocio.', 'dimension': 'ae'},
+    {'text': 'Me siento vacío/a al final de la jornada de trabajo.', 'dimension': 'ae'},
+    {'text': 'Me levanto cansado/a y con desgana de enfrentarme a otro día de emprendedor/a.', 'dimension': 'ae'},
+    {'text': 'Trabajar en mi negocio durante todo el día me exige un esfuerzo enorme.', 'dimension': 'ae'},
+    {'text': 'Siento que me estoy quemando en este proceso.', 'dimension': 'ae'},
+    {'text': 'Me siento frustrado/a con mi trabajo o negocio.', 'dimension': 'ae'},
+    {'text': 'Creo que estoy trabajando demasiado para lo que recibo a cambio.', 'dimension': 'ae'},
+    {'text': 'Lidiar con clientes, equipo o socios me genera un estrés agotador.', 'dimension': 'ae'},
+    {'text': 'Siento que ya llegué al límite de mis fuerzas.', 'dimension': 'ae'},
+
+    // ── DESPERSONALIZACIÓN (dp) ──
+    {'text': 'Trato a algunos clientes o colaboradores de forma fría o distante, como si no me importaran.', 'dimension': 'dp'},
+    {'text': 'Me volví más insensible con las personas que me rodean desde que empecé a emprender.', 'dimension': 'dp'},
+    {'text': 'Me preocupa que este trabajo me esté endureciendo emocionalmente.', 'dimension': 'dp'},
+    {'text': 'Realmente no me importa demasiado lo que le pase a ciertos clientes o miembros de mi equipo.', 'dimension': 'dp'},
+    {'text': 'Siento que mi entorno (clientes, equipo, familia) me responsabiliza de sus problemas.', 'dimension': 'dp'},
+
+    // ── REALIZACIÓN PERSONAL (rp) — dimensión positiva ──
+    {'text': 'Entiendo con facilidad cómo se sienten mis clientes o equipo.', 'dimension': 'rp'},
+    {'text': 'Resuelvo los problemas de mi negocio de forma efectiva.', 'dimension': 'rp'},
+    {'text': 'Siento que mi trabajo tiene un impacto positivo en la vida de otras personas.', 'dimension': 'rp'},
+    {'text': 'Me siento con energía y vitalidad en mi rol de emprendedor/a.', 'dimension': 'rp'},
+    {'text': 'Me siento motivado/a después de interactuar con mis clientes.', 'dimension': 'rp'},
+    {'text': 'Creo que estoy logrando cosas valiosas con este trabajo.', 'dimension': 'rp'},
+    {'text': 'Manejo los desafíos emocionales de emprender con calma y claridad.', 'dimension': 'rp'},
+    {'text': 'Al terminar mi jornada, me siento satisfecho/a con lo que hice.', 'dimension': 'rp'},
   ];
 
+  // Escala de frecuencia MBI (0–6).
   static const List<Map<String, dynamic>> _options = [
     {'label': 'Nunca', 'value': 0, 'color': 0xFF4CAF50},
     {'label': 'Pocas veces al año', 'value': 1, 'color': 0xFF8BC34A},
     {'label': 'Una vez al mes', 'value': 2, 'color': 0xFFFFC107},
-    {'label': 'Varias veces al mes', 'value': 3, 'color': 0xFFFF9800},
-    {'label': 'Una vez por semana', 'value': 4, 'color': 0xFFFF5722},
-    {'label': 'Varias veces por semana', 'value': 5, 'color': 0xFFE53935},
+    {'label': 'Algunas veces al mes', 'value': 3, 'color': 0xFFFF9800},
+    {'label': 'Una vez a la semana', 'value': 4, 'color': 0xFFFF5722},
+    {'label': 'Varias veces a la semana', 'value': 5, 'color': 0xFFE53935},
     {'label': 'Todos los días', 'value': 6, 'color': 0xFFB71C1C},
   ];
 
@@ -196,69 +160,154 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
     );
   }
 
-  // ── Scoring ──
+  // ── Scoring (cutoffs MBI estándar) ──
+  // Máximos: AE 54 (9×6), DP 30 (5×6), RP 48 (8×6, dimensión positiva).
 
   Map<String, int> get _scores {
-    int exhaustion = 0;
-    int cynicism = 0;
-    int efficacy = 0;
+    int ae = 0, dp = 0, rp = 0;
     for (int i = 0; i < _questions.length; i++) {
-      final q = _questions[i];
+      final dim = _questions[i]['dimension'];
       final raw = _answers[i] ?? 0;
-      // Reverse: high efficacy answers reduce burnout, so we don't reverse here
-      // We just sum: efficacy is positive (high = good), exhaustion/cynicism are negative (high = bad)
-      if (q['dimension'] == 'exhaustion') exhaustion += raw;
-      if (q['dimension'] == 'cynicism') cynicism += raw;
-      if (q['dimension'] == 'efficacy') efficacy += raw;
+      if (dim == 'ae') {
+        ae += raw;
+      } else if (dim == 'dp') {
+        dp += raw;
+      } else if (dim == 'rp') {
+        rp += raw;
+      }
     }
-    return {'exhaustion': exhaustion, 'cynicism': cynicism, 'efficacy': efficacy};
+    return {'ae': ae, 'dp': dp, 'rp': rp};
   }
 
-  /// Burnout severity: 0 (none) to 3 (high)
-  int get _severity {
-    final s = _scores;
-    // Exhaustion: 0-30, Cynicism: 0-24, Efficacy: 0-36 (lower = worse)
-    final exhaustionHigh = s['exhaustion']! >= 18;
-    final cynicismHigh = s['cynicism']! >= 12;
-    final efficacyLow = s['efficacy']! < 18;
-    final flags = [exhaustionHigh, cynicismHigh, efficacyLow].where((f) => f).length;
-    if (flags == 0) return 0;
-    if (flags == 1) return 1;
-    if (flags == 2) return 2;
-    return 3;
+  /// Nivel por dimensión: 'low' | 'medium' | 'high'.
+  String get _aeLevel {
+    final v = _scores['ae']!;
+    return v >= 27 ? 'high' : (v >= 19 ? 'medium' : 'low');
   }
+
+  String get _dpLevel {
+    final v = _scores['dp']!;
+    return v >= 10 ? 'high' : (v >= 6 ? 'medium' : 'low');
+  }
+
+  /// RP es positiva: alto = bueno. Por eso bajo = peor (invertida).
+  String get _rpLevel {
+    final v = _scores['rp']!;
+    return v <= 33 ? 'low' : (v <= 39 ? 'medium' : 'high');
+  }
+
+  /// Nº de indicadores de burnout activos (0–3): AE alto + DP alto + RP bajo.
+  int get _severity {
+    int flags = 0;
+    if (_aeLevel == 'high') flags++;
+    if (_dpLevel == 'high') flags++;
+    if (_rpLevel == 'low') flags++;
+    return flags;
+  }
+
+  /// Riesgo global a mostrar: 'low' (0) · 'medium' (1–2) · 'high' (3).
+  String get _risk => _severity == 3 ? 'high' : (_severity >= 1 ? 'medium' : 'low');
 
   Map<String, dynamic> get _severityData {
-    switch (_severity) {
-      case 0:
+    switch (_risk) {
+      case 'high':
         return {
-          'label': 'Sin signos de burnout',
-          'description': 'Tu bienestar laboral está en buen estado. Seguí cuidándote.',
-          'color': const Color(0xFF4CAF50),
-          'icon': Icons.check_circle_rounded,
+          'label': 'Riesgo alto de burnout',
+          'description': 'Tus niveles indican un agotamiento significativo. Esto no es normal ni necesario: tu bienestar es parte de la estrategia. Te recomendamos buscar apoyo de un profesional de salud mental.',
+          'color': const Color(0xFFE53935),
+          'icon': Icons.warning_rounded,
         };
-      case 1:
+      case 'medium':
         return {
-          'label': 'Riesgo bajo',
-          'description': 'Hay señales tempranas. Es buen momento para reforzar pausas y autocuidado.',
-          'color': const Color(0xFFFFD93D),
-          'icon': Icons.info_rounded,
-        };
-      case 2:
-        return {
-          'label': 'Riesgo moderado',
-          'description': 'Estás mostrando signos claros de agotamiento. Necesitás priorizar tu salud mental.',
+          'label': 'Señales de alerta',
+          'description': 'Hay señales que merecen atención. Estás en una zona de alerta donde el autocuidado puede marcar la diferencia antes de que escale.',
           'color': const Color(0xFFFF9800),
           'icon': Icons.warning_amber_rounded,
         };
       default:
         return {
-          'label': 'Riesgo alto',
-          'description': 'Tu nivel de agotamiento es significativo. Considerá buscar apoyo profesional.',
-          'color': const Color(0xFFE53935),
-          'icon': Icons.warning_rounded,
+          'label': 'Sin burnout significativo',
+          'description': 'Tus niveles son saludables. Eso no es casualidad: es el resultado de cómo estás manejando tu energía. Seguí cuidándote.',
+          'color': const Color(0xFF4CAF50),
+          'icon': Icons.check_circle_rounded,
         };
     }
+  }
+
+  /// Datos de cada dimensión para la vista de resultados (3 niveles MBI).
+  List<Map<String, dynamic>> get _dimensionResults {
+    final s = _scores;
+    return [
+      {
+        'name': 'Agotamiento emocional',
+        'score': s['ae']!,
+        'max': 54,
+        'level': _aeLevel,
+        'inverse': false,
+        'descs': {
+          'high': 'Nivel alto. Te sentís emocionalmente drenado/a. Es la señal más importante del burnout.',
+          'medium': 'Nivel moderado. El cansancio está presente pero todavía manejable.',
+          'low': 'Nivel bajo. Tu energía emocional está bien sostenida.',
+        },
+      },
+      {
+        'name': 'Despersonalización',
+        'score': s['dp']!,
+        'max': 30,
+        'level': _dpLevel,
+        'inverse': false,
+        'descs': {
+          'high': 'Nivel alto. Estás desarrollando una distancia emocional con tu entorno. Es señal de agotamiento profundo.',
+          'medium': 'Nivel moderado. Hay cierta distancia emocional que vale la pena trabajar.',
+          'low': 'Nivel bajo. Mantenés conexión genuina con clientes y equipo.',
+        },
+      },
+      {
+        'name': 'Realización personal',
+        'score': s['rp']!,
+        'max': 48,
+        'level': _rpLevel,
+        'inverse': true,
+        'descs': {
+          'high': 'Nivel alto. Sentís que tu trabajo tiene sentido e impacto. Es un factor protector clave.',
+          'medium': 'Nivel moderado. Tu sentido de logro existe pero podría ser más sólido.',
+          'low': 'Nivel bajo. Sentís que tu trabajo no tiene el impacto o el sentido que esperabas.',
+        },
+      },
+    ];
+  }
+
+  /// Texto interpretativo dinámico ("¿Qué significa esto para vos?").
+  List<String> get _interpretation {
+    if (_risk == 'high') {
+      return [
+        'Tus resultados muestran los tres indicadores del burnout en niveles críticos: agotamiento emocional alto, despersonalización alta y realización personal baja. No es un estado permanente, pero sí una señal que no podés ignorar.',
+        'El burnout en emprendedores no aparece de golpe: es la acumulación de meses operando al máximo sin reponer energía. Tu cuerpo y tu mente te están diciendo que el ritmo actual no es sostenible.',
+        'Lo más importante ahora: priorizá una conversación con un profesional de salud mental. No es debilidad, es estrategia. Un founder quemado toma peores decisiones.',
+      ];
+    }
+    if (_risk == 'medium') {
+      final msgs = <String>[];
+      if (_aeLevel == 'high') {
+        msgs.add('Tu agotamiento emocional está en zona alta: revisá tus límites y tu ritmo de trabajo.');
+      }
+      if (_dpLevel == 'high') {
+        msgs.add('Estás desarrollando cierta distancia con tu entorno: reconectá con el propósito de lo que hacés.');
+      }
+      if (_rpLevel == 'low') {
+        msgs.add('Tu sentido de realización necesita atención: celebrá los logros pequeños, no solo los grandes.');
+      }
+      return [
+        'Estás en zona de alerta. No es burnout severo, pero hay señales concretas que requieren acción antes de que escalen.',
+        if (msgs.isNotEmpty) msgs.join(' '),
+        'Esta es exactamente la zona donde muchos founders se quedan meses sin hacer nada hasta que el sistema colapsa. El momento de actuar es ahora, cuando todavía tenés margen.',
+      ];
+    }
+    return [
+      'Tus niveles son saludables en este momento: el agotamiento está bajo control, mantenés conexión genuina con tu trabajo y sentís que lo que hacés tiene sentido.',
+      'Esto no es permanente ni garantizado. El burnout en founders suele aparecer tras períodos de crecimiento acelerado, crisis o cambios importantes. Seguí monitoreando tu estado.',
+      'Volvé a hacer este test en 3 meses o cuando notes un cambio en tu energía.',
+    ];
   }
 
   // ── Build ──
@@ -433,6 +482,21 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
                                 ],
                               ),
                             ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: _accentColor.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border(
+                                  left: BorderSide(color: _accentColor, width: 3),
+                                ),
+                              ),
+                              child: Text(
+                                'Este test es una autoevaluación basada en el MBI y no reemplaza un diagnóstico profesional. Si obtenés niveles altos, te recomendamos buscar apoyo de un profesional de salud mental.',
+                                style: GoogleFonts.manrope(fontSize: 12, color: SentioColors.textSecondary, height: 1.5),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -569,7 +633,12 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
                               // Options
                               ..._options.map((opt) {
                                 final isSelected = _answers[_currentQuestion] == opt['value'];
-                                final color = Color(opt['color'] as int);
+                                // En realización personal (positiva) "más frecuente" es bueno:
+                                // invertimos el color para no marcar en rojo una respuesta positiva.
+                                final isPositive = q['dimension'] == 'rp';
+                                final value = opt['value'] as int;
+                                final colorIndex = isPositive ? (_options.length - 1 - value) : value;
+                                final color = Color(_options[colorIndex]['color'] as int);
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
                                   child: _SpringTap(
@@ -640,7 +709,6 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
   Widget _buildResultsView() {
     final data = _severityData;
     final color = data['color'] as Color;
-    final scores = _scores;
 
     return Scaffold(
       backgroundColor: SentioColors.background,
@@ -724,33 +792,14 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
                           ),
                         ),
                         const SizedBox(height: 32),
-                        // Dimension scores
-                        _buildDimension(
-                          'Agotamiento emocional',
-                          scores['exhaustion']!,
-                          30,
-                          'Cómo te sentís emocionalmente con tu trabajo',
-                          const Color(0xFFE53935),
-                          inverse: false,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildDimension(
-                          'Despersonalización',
-                          scores['cynicism']!,
-                          24,
-                          'Tu actitud hacia las personas con las que trabajás',
-                          const Color(0xFFFF9800),
-                          inverse: false,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildDimension(
-                          'Realización personal',
-                          scores['efficacy']!,
-                          36,
-                          'Tu sentido de logro y eficacia profesional',
-                          const Color(0xFF4CAF50),
-                          inverse: true,
-                        ),
+                        // Dimension scores (3 niveles MBI)
+                        ..._dimensionResults.expand((d) => [
+                              _buildDimensionCard(d),
+                              const SizedBox(height: 12),
+                            ]),
+                        const SizedBox(height: 4),
+                        // Interpretación dinámica
+                        _buildInterpretationBox(),
                         const SizedBox(height: 24),
                         // Recommendations
                         if (_severity > 0) ...[
@@ -836,14 +885,29 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
     );
   }
 
-  Widget _buildDimension(String name, int score, int max, String hint, Color color, {required bool inverse}) {
-    final fraction = score / max;
-    // For "efficacy" (inverse), high is good; for others, low is good
-    final isHealthy = inverse ? fraction >= 0.5 : fraction < 0.5;
-    final displayColor = isHealthy ? const Color(0xFF4CAF50) : color;
+  // Color según nivel y si la dimensión es positiva (RP, inverse) o negativa.
+  Color _levelColor(String level, bool inverse) {
+    final bad = inverse ? 'low' : 'high';
+    final good = inverse ? 'high' : 'low';
+    if (level == bad) return const Color(0xFFE53935);
+    if (level == good) return const Color(0xFF4CAF50);
+    return const Color(0xFFFF9800);
+  }
+
+  String _levelName(String level) =>
+      level == 'high' ? 'Alto' : (level == 'medium' ? 'Moderado' : 'Bajo');
+
+  Widget _buildDimensionCard(Map<String, dynamic> d) {
+    final score = d['score'] as int;
+    final max = d['max'] as int;
+    final level = d['level'] as String;
+    final inverse = d['inverse'] as bool;
+    final fraction = (score / max).clamp(0.0, 1.0);
+    final color = _levelColor(level, inverse);
+    final desc = (d['descs'] as Map)[level] as String;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: SentioColors.surface,
         borderRadius: BorderRadius.circular(14),
@@ -855,15 +919,15 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
           Row(
             children: [
               Expanded(
-                child: Text(name,
+                child: Text(d['name'] as String,
                   style: GoogleFonts.manrope(
-                    fontSize: 13, fontWeight: FontWeight.w700, color: SentioColors.textPrimary,
+                    fontSize: 14, fontWeight: FontWeight.w700, color: SentioColors.textPrimary,
                   ),
                 ),
               ),
               Text('$score / $max',
                 style: GoogleFonts.manrope(
-                  fontSize: 12, fontWeight: FontWeight.w800, color: displayColor,
+                  fontSize: 13, fontWeight: FontWeight.w800, color: color,
                 ),
               ),
             ],
@@ -878,37 +942,87 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
               builder: (_, value, __) => LinearProgressIndicator(
                 value: value,
                 backgroundColor: Colors.white.withValues(alpha: 0.05),
-                valueColor: AlwaysStoppedAnimation(displayColor),
+                valueColor: AlwaysStoppedAnimation(color),
                 minHeight: 6,
               ),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(hint,
-            style: GoogleFonts.manrope(fontSize: 11, color: SentioColors.textTertiary, height: 1.3),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(_levelName(level),
+              style: GoogleFonts.manrope(
+                fontSize: 11, fontWeight: FontWeight.w800, color: color, letterSpacing: 0.3,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(desc,
+            style: GoogleFonts.manrope(fontSize: 12, color: SentioColors.textSecondary, height: 1.4),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildInterpretationBox() {
+    final color = _severityData['color'] as Color;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: SentioColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.insights_rounded, size: 18, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('¿Qué significa esto para vos?',
+                  style: GoogleFonts.manrope(
+                    fontSize: 14, fontWeight: FontWeight.w700, color: SentioColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ..._interpretation.map((p) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(p,
+              style: GoogleFonts.manrope(fontSize: 13, color: SentioColors.textSecondary, height: 1.55),
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
   List<String> get _recommendations {
-    final s = _scores;
     final list = <String>[];
-    if (s['exhaustion']! >= 18) {
-      list.add('Programá pausas regulares durante el día — usá la herramienta de respiración 4-7-8');
-      list.add('Establecé un horario fijo para desconectarte del trabajo');
+    if (_aeLevel != 'low') {
+      list.add('Programá pausas reales durante el día — probá la respiración 4-7-8.');
+      list.add('Fijá un horario para desconectarte del trabajo y respetalo.');
     }
-    if (s['cynicism']! >= 12) {
-      list.add('Reconectá con el "por qué" de lo que hacés — escribí en el diario sobre tus motivaciones');
-      list.add('Buscá una conversación significativa con alguien de tu equipo');
+    if (_dpLevel != 'low') {
+      list.add('Reconectá con el "por qué" de lo que hacés — escribilo en el diario.');
+      list.add('Buscá una conversación genuina con alguien de tu equipo o entorno.');
     }
-    if (s['efficacy']! < 18) {
-      list.add('Anotá 3 cosas que lograste esta semana, por más pequeñas que sean');
-      list.add('Considerá hablar con un profesional de salud mental');
+    if (_rpLevel != 'high') {
+      list.add('Anotá 3 cosas que lograste esta semana, por más chicas que sean.');
     }
-    if (_severity >= 3) {
-      list.add('Si estás en crisis, usá el botón rojo (corazón) para acceder a líneas de ayuda');
+    if (_risk == 'high') {
+      list.add('Considerá hablar con un profesional de salud mental.');
+      list.add('Si estás en crisis, usá el botón de ayuda (corazón) para líneas de apoyo.');
     }
     return list;
   }

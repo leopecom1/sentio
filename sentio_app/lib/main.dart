@@ -52,7 +52,7 @@ class _SentioAppState extends State<SentioApp> {
     return ChangeNotifierProvider.value(
       value: widget.appProvider,
       child: MaterialApp.router(
-        title: 'Sentio',
+        title: 'B2Better',
         debugShowCheckedModeBanner: false,
         theme: SentioTheme.light(),
         darkTheme: SentioTheme.dark(),

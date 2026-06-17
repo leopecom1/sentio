@@ -44,6 +44,100 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     super.dispose();
   }
 
+  /// Opens a reason picker and submits a content report.
+  Future<void> _reportContent(String contentType, String contentId) async {
+    final reasons = [
+      'Contenido inapropiado u ofensivo',
+      'Spam o engañoso',
+      'Acoso o discurso de odio',
+      'Contenido sexual o violento',
+      'Otro',
+    ];
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: SentioColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+              child: Text(
+                'Reportar contenido',
+                style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.w700, color: SentioColors.textPrimary),
+              ),
+            ),
+            ...reasons.map((r) => ListTile(
+                  title: Text(r, style: GoogleFonts.manrope(color: SentioColors.textPrimary)),
+                  onTap: () => Navigator.of(ctx).pop(r),
+                )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (reason == null || !mounted) return;
+    final ok = await context.read<AppProvider>().reportContent(
+          contentType: contentType,
+          contentId: contentId,
+          reason: reason,
+        );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Gracias. Revisaremos el contenido reportado.'
+            : 'No se pudo enviar el reporte. Intentá de nuevo.'),
+      ),
+    );
+  }
+
+  /// Confirms and blocks a user, then leaves the post.
+  Future<void> _confirmBlockUser(String userId, String userName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SentioColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Bloquear a $userName',
+            style: GoogleFonts.manrope(fontWeight: FontWeight.w700, color: SentioColors.textPrimary)),
+        content: Text(
+          'No volverás a ver sus publicaciones, historias ni comentarios. '
+          'Podés desbloquearlo más tarde desde tu perfil.',
+          style: GoogleFonts.manrope(color: SentioColors.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancelar', style: GoogleFonts.manrope(color: SentioColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: SentioColors.error, foregroundColor: Colors.white),
+            child: Text('Bloquear', style: GoogleFonts.manrope(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final ok = await context.read<AppProvider>().blockUser(userId);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$userName fue bloqueado.')),
+      );
+      context.pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo bloquear al usuario.')),
+      );
+    }
+  }
+
   String _timeAgo(DateTime date) {
     final diff = DateTime.now().difference(date);
     if (diff.inMinutes < 60) return '${diff.inMinutes}m';
@@ -79,6 +173,41 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           onPressed: () => context.pop(),
         ),
         title: const Text('Publicación'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: SentioColors.textSecondary),
+            color: SentioColors.surface,
+            onSelected: (value) {
+              if (value == 'report') {
+                _reportContent('post', post.id);
+              } else if (value == 'block') {
+                _confirmBlockUser(post.userId, post.userName);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'report',
+                child: Row(
+                  children: [
+                    const Icon(Icons.flag_outlined, size: 18, color: SentioColors.textSecondary),
+                    const SizedBox(width: 10),
+                    Text('Reportar publicación', style: GoogleFonts.manrope(color: SentioColors.textPrimary)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'block',
+                child: Row(
+                  children: [
+                    const Icon(Icons.block_rounded, size: 18, color: SentioColors.error),
+                    const SizedBox(width: 10),
+                    Text('Bloquear a ${post.userName}', style: GoogleFonts.manrope(color: SentioColors.error)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -258,7 +387,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Widget _buildCommentTile(CommunityComment comment) {
-    return Padding(
+    return GestureDetector(
+      onLongPress: () => _showCommentActions(comment),
+      child: Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,6 +413,41 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
           ),
         ],
+      ),
+      ),
+    );
+  }
+
+  /// Bottom sheet shown on long-press of a comment (report / block author).
+  void _showCommentActions(CommunityComment comment) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: SentioColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.flag_outlined, color: SentioColors.textSecondary),
+              title: Text('Reportar comentario', style: GoogleFonts.manrope(color: SentioColors.textPrimary)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _reportContent('comment', comment.id);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.block_rounded, color: SentioColors.error),
+              title: Text('Bloquear a ${comment.userName}', style: GoogleFonts.manrope(color: SentioColors.error)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _confirmBlockUser(comment.userId, comment.userName);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

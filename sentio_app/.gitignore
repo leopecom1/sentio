@@ -43,3 +43,14 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Secrets (no commitear)
+env.json
+
+# Fastlane - credenciales (NUNCA commitear)
+android/fastlane/play-service-account.json
+ios/fastlane/app_store_connect_api_key.json
+ios/fastlane/AuthKey_*.p8
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/*.log

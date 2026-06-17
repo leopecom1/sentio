@@ -1,0 +1,1 @@
+Coloca aquí las capturas (1.png, 2.png...). Mínimo 2. icon.png y featureGraphic.png van en ../

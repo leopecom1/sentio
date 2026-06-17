@@ -57,6 +57,14 @@ class _CheckinScreenState extends State<CheckinScreen> {
         duration: const Duration(milliseconds: 400),
         curve: Curves.easeOutCubic,
       );
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Elegí cómo te sentís para registrar tu check-in.'),
+          backgroundColor: SentioColors.accent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -162,9 +170,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _MiniStat(label: 'Energia', value: '$_energy/5'),
+                _MiniStat(label: 'Energía', value: '$_energy/5'),
                 const SizedBox(width: 24),
-                _MiniStat(label: 'Estres', value: '$_stress/5'),
+                _MiniStat(label: 'Estrés', value: '$_stress/5'),
               ],
             ),
             const SizedBox(height: 24),
@@ -184,15 +192,15 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
   String _getClosingMessage() {
     if (_stress >= 4) {
-      return 'Hoy fue pesado, y esta bien reconocerlo.\nGracias por ser honesto con vos mismo.';
+      return 'Hoy fue pesado, y está bien reconocerlo.\nGracias por ser honesto con vos mismo.';
     }
     if (_energy <= 2) {
-      return 'Tu cuerpo te esta pidiendo un respiro.\nCuidarte es estrategia, no debilidad.';
+      return 'Tu cuerpo te está pidiendo un respiro.\nCuidarte es estrategia, no debilidad.';
     }
     if (_emotion == 'motivated' || _emotion == 'focused') {
-      return 'Que bueno sentir esa energia.\nAprovecha este momento.';
+      return 'Qué bueno sentir esa energía.\nAprovechá este momento.';
     }
-    return 'Gracias por registrar como te sentis.\nCada check-in es un acto de cuidado.';
+    return 'Gracias por registrar cómo te sentís.\nCada check-in es un acto de cuidado.';
   }
 
   @override
@@ -315,7 +323,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Como te sentis?',
+          '¿Cómo te sentís?',
           style: GoogleFonts.manrope(
             fontSize: 28,
             fontWeight: FontWeight.w800,
@@ -342,7 +350,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Emocion',
+          'Emoción',
           style: GoogleFonts.manrope(
             fontSize: 15,
             fontWeight: FontWeight.w600,
@@ -431,7 +439,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Nivel de estres',
+                'Nivel de estrés',
                 style: GoogleFonts.manrope(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -496,7 +504,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Nivel de energia',
+                'Nivel de energía',
                 style: GoogleFonts.manrope(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -579,7 +587,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
               color: SentioColors.textPrimary,
             ),
             decoration: InputDecoration(
-              hintText: 'Que tenes en mente?',
+              hintText: '¿Qué tenés en mente?',
               hintStyle: GoogleFonts.manrope(
                 fontSize: 14,
                 color: SentioColors.textTertiary,
@@ -612,7 +620,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Que provoco esto?',
+          '¿Qué provocó esto?',
           style: GoogleFonts.manrope(
             fontSize: 15,
             fontWeight: FontWeight.w600,
@@ -719,7 +727,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Motivacion, presion financiera, control, calidad del dia',
+                          'Motivación, presión financiera, control, calidad del día',
                           style: GoogleFonts.manrope(
                             fontSize: 12,
                             color: SentioColors.textTertiary,
@@ -788,9 +796,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
           ),
           const SizedBox(height: 20),
           _DeepSlider(
-            title: 'Calidad del dia',
-            leftLabel: 'Mal dia',
-            rightLabel: 'Buen dia',
+            title: 'Calidad del día',
+            leftLabel: 'Mal día',
+            rightLabel: 'Buen día',
             value: _dayQuality,
             color: const Color(0xFF9B8EC4),
             onChanged: (v) => setState(() => _dayQuality = v),

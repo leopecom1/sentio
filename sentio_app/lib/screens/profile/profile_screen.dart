@@ -68,6 +68,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _confirmDeleteAccount() async {
+    HapticFeedback.mediumImpact();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SentioColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Eliminar cuenta',
+          style: GoogleFonts.manrope(
+            fontWeight: FontWeight.w800,
+            color: SentioColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Esta acción es permanente. Se borrarán tu cuenta y todos tus datos '
+          '(check-ins, diario, finanzas, conversaciones y comunidad). '
+          'No se puede deshacer.',
+          style: GoogleFonts.manrope(
+            fontSize: 14,
+            height: 1.5,
+            color: SentioColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.manrope(color: SentioColors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Eliminar',
+              style: GoogleFonts.manrope(
+                color: SentioColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final ok = await context.read<AppProvider>().deleteAccount();
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // cerrar loader
+
+    if (ok) {
+      context.go('/auth');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo eliminar la cuenta. Reintentá.'),
+          backgroundColor: SentioColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   void _showAvatarSourceSheet() {
     HapticFeedback.selectionClick();
     showModalBottomSheet(
@@ -309,6 +380,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: SentioColors.error,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    GestureDetector(
+                      onTap: _confirmDeleteAccount,
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Eliminar cuenta',
+                          style: GoogleFonts.manrope(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: SentioColors.error,
+                            decoration: TextDecoration.underline,
+                            decorationColor: SentioColors.error,
                           ),
                         ),
                       ),
