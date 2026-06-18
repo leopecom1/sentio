@@ -57,6 +57,10 @@ class AppProvider extends ChangeNotifier {
   // la app muestra una pantalla bloqueante con botón a la tienda.
   bool _forceUpdateRequired = false;
   String? _forceUpdateStoreUrl;
+  // Config del asistente IA (cacheada por sesión, editable desde el admin).
+  final Map<String, String> _aiConfig = {};
+  List<Map<String, dynamic>> _aiKnowledge = [];
+  bool _aiSettingsLoaded = false;
   Checkin? _todayCheckin;
   String _dailyPhrase = '';
   List<Map<String, dynamic>> _articles = [];
@@ -1042,23 +1046,85 @@ class AppProvider extends ChangeNotifier {
     return 'Hola, $name. ¿Cómo estás hoy? Contame lo que necesites, estoy acá para escucharte.';
   }
 
+  /// Personalidad por defecto si no se pudo leer la config del admin.
+  static const String _defaultAiPrompt =
+      'Sos el asistente de bienestar de B2Better, para acompañar a emprendedores. '
+      'Hablás en español rioplatense (vos, querés, sentís), cálido y cercano, como un mentor '
+      'que escucha de verdad y ayuda a avanzar. Validá en una frase breve lo que la persona '
+      'siente (sin sonar a manual ni repetir lo que dijo) y aportá algo útil: una perspectiva, '
+      'un reencuadre o un paso concreto y chico. Preguntá como mucho una sola cosa, y solo si '
+      'de verdad ayuda. Respuestas cortas y humanas (2 a 5 oraciones), sin listas largas ni '
+      'sermones. Sos una IA, no un profesional de salud mental; no des diagnósticos. Ante '
+      'señales de crisis sugerí ayuda profesional y el botón de apoyo de la app.';
+
+  /// Carga (una vez por sesión) la config del asistente y la base de
+  /// conocimiento editables desde el admin (app_config + ai_knowledge).
+  Future<void> _loadAiSettings() async {
+    if (_aiSettingsLoaded) return;
+    try {
+      final cfg = await _supabase
+          .from('app_config')
+          .select('key, value')
+          .inFilter('key', ['ai_system_prompt', 'ai_model', 'ai_temperature']);
+      for (final r in cfg as List) {
+        _aiConfig[r['key'] as String] = (r['value'] ?? '') as String;
+      }
+      final kb = await _supabase
+          .from('ai_knowledge')
+          .select('title, content, category')
+          .eq('is_active', true)
+          .order('priority', ascending: false)
+          .limit(40);
+      _aiKnowledge = List<Map<String, dynamic>>.from(kb as List);
+      _aiSettingsLoaded = true;
+    } catch (e) {
+      debugPrint('AI settings load failed (uso defaults): $e');
+      // No marcamos loaded para reintentar en el próximo mensaje.
+    }
+  }
+
   Future<String> _getOpenAIResponse(String userMessage) async {
     try {
-      // Build conversation history for context
+      await _loadAiSettings();
+
+      final base = (_aiConfig['ai_system_prompt']?.trim().isNotEmpty ?? false)
+          ? _aiConfig['ai_system_prompt']!.trim()
+          : _defaultAiPrompt;
+      final model = (_aiConfig['ai_model']?.trim().isNotEmpty ?? false)
+          ? _aiConfig['ai_model']!.trim()
+          : 'gpt-4o-mini';
+      final temperature = double.tryParse(_aiConfig['ai_temperature'] ?? '') ?? 0.7;
+
+      // Contexto del usuario para personalizar.
+      final ctx = StringBuffer('Contexto del usuario: se llama $userName.');
+      if (_todayCheckin != null) {
+        ctx.write(' Hoy registró sentirse "${_todayCheckin!.primaryEmotion}" '
+            '(energía ${_todayCheckin!.energyLevel}/5, estrés ${_todayCheckin!.stressLevel}/5).');
+      } else if (_profile?.currentMood != null) {
+        ctx.write(' Su ánimo reciente: "${_profile!.currentMood}".');
+      }
+      if (_profile?.pressureTypes.isNotEmpty ?? false) {
+        ctx.write(' Lo que más le pesa: ${_profile!.pressureTypes.join(", ")}.');
+      }
+
+      // Base de conocimiento (acotada para controlar tokens).
+      final kbBuf = StringBuffer();
+      for (final k in _aiKnowledge) {
+        final line = '- (${k['category'] ?? 'General'}) ${k['title']}: ${k['content']}\n';
+        if (kbBuf.length + line.length > 3500) break;
+        kbBuf.write(line);
+      }
+
+      final systemContent = StringBuffer(base)..write('\n\n$ctx');
+      if (kbBuf.isNotEmpty) {
+        systemContent.write('\n\nBase de conocimiento de B2Better (usala con naturalidad, no la cites):\n$kbBuf');
+      }
+
       final messages = <Map<String, String>>[
-        {
-          'role': 'system',
-          'content': 'Sos un asistente conversacional de bienestar con inteligencia artificial, '
-              'especializado en acompañar a emprendedores. Hablás en español rioplatense '
-              '(vos, querés, sentís). Sos cálido, genuino y directo. Validás emociones antes '
-              'de sugerir acciones. Tus respuestas son concisas (2-4 oraciones máximo). '
-              'No sos un profesional de la salud mental y no das diagnósticos ni tratamientos; '
-              'si te preguntan, aclará con naturalidad que sos una IA. Ante señales de crisis o '
-              'riesgo, recomendá buscar ayuda profesional y usar el botón de apoyo de la app.',
-        },
+        {'role': 'system', 'content': systemContent.toString()},
       ];
 
-      // Add recent conversation history (last 10 messages)
+      // Historial reciente (últimos 10 mensajes).
       final recentMessages = _currentMessages.length > 10
           ? _currentMessages.sublist(_currentMessages.length - 10)
           : _currentMessages;
@@ -1068,18 +1134,16 @@ class AppProvider extends ChangeNotifier {
           'content': msg.content,
         });
       }
-
-      // Add the current message
       messages.add({'role': 'user', 'content': userMessage});
 
       // La clave de OpenAI vive en el servidor (Supabase Vault). La app llama
       // a la función `ai_proxy`, que reenvía la petición a OpenAI.
       final data = await _supabase.rpc('ai_proxy', params: {
         'p_payload': {
-          'model': 'gpt-4o-mini',
+          'model': model,
           'messages': messages,
-          'max_tokens': 300,
-          'temperature': 0.8,
+          'max_tokens': 320,
+          'temperature': temperature,
         },
       });
 
