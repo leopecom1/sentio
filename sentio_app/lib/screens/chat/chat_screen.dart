@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +18,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   bool _isSending = false;
+  // Metas ya agregadas desde el chat (para marcar el botón como hecho).
+  final Set<String> _addedGoalTitles = {};
 
   static const String _consentKey = 'chat_ai_consent_v1';
 
@@ -629,41 +632,107 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(width: 10),
           ],
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isUser ? SentioColors.primary : SentioColors.surface,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(20),
-                  topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(isUser ? 20 : 0),
-                  bottomRight: Radius.circular(isUser ? 0 : 20),
+            child: Column(
+              crossAxisAlignment:
+                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isUser ? SentioColors.primary : SentioColors.surface,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: Radius.circular(isUser ? 20 : 0),
+                      bottomRight: Radius.circular(isUser ? 0 : 20),
+                    ),
+                    border:
+                        isUser ? null : Border.all(color: SentioColors.border),
+                    boxShadow: isUser
+                        ? [
+                            BoxShadow(
+                              color: SentioColors.primary.withOpacity(0.20),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    isUser ? content : AppProvider.stripGoalMarkers(content),
+                    style: GoogleFonts.manrope(
+                      fontSize: 15,
+                      height: 1.5,
+                      fontWeight: FontWeight.w400,
+                      color: isUser ? Colors.white : SentioColors.textPrimary,
+                    ),
+                  ),
                 ),
-                border: isUser
-                    ? null
-                    : Border.all(color: SentioColors.border),
-                boxShadow: isUser
-                    ? [
-                        BoxShadow(
-                          color: SentioColors.primary.withOpacity(0.20),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Text(
-                content,
-                style: GoogleFonts.manrope(
-                  fontSize: 15,
-                  height: 1.5,
-                  fontWeight: FontWeight.w400,
-                  color: isUser ? Colors.white : SentioColors.textPrimary,
-                ),
-              ),
+                if (!isUser)
+                  ...AppProvider.parseGoalSuggestions(content)
+                      .map(_buildGoalChip),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Botón que sugiere agregar una meta propuesta por el asistente.
+  Widget _buildGoalChip(String title) {
+    final added = _addedGoalTitles.contains(title);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: GestureDetector(
+        onTap: added
+            ? null
+            : () {
+                HapticFeedback.lightImpact();
+                context
+                    .read<AppProvider>()
+                    .addGoal(title, source: 'chat');
+                setState(() => _addedGoalTitles.add(title));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('Meta agregada: $title'),
+                  backgroundColor: SentioColors.accent,
+                  behavior: SnackBarBehavior.floating,
+                ));
+              },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: (added ? SentioColors.accent : SentioColors.primary)
+                .withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: added
+                  ? SentioColors.accent
+                  : SentioColors.primary.withValues(alpha: 0.45),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(added ? Icons.check_rounded : Icons.add_rounded,
+                  size: 16,
+                  color: added ? SentioColors.accent : SentioColors.primary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  added ? title : 'Agregar meta: $title',
+                  style: GoogleFonts.manrope(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color:
+                        added ? SentioColors.accent : SentioColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -22,6 +22,7 @@ import 'package:sentio_app/services/gamification_service.dart';
 import 'package:sentio_app/models/financial_account.dart';
 import 'package:sentio_app/models/financial_transaction.dart';
 import 'package:sentio_app/models/custom_category.dart';
+import 'package:sentio_app/models/user_goal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum CelebrationEvent { xpGained, streakMilestone, levelUp, achievementUnlocked }
@@ -57,6 +58,8 @@ class AppProvider extends ChangeNotifier {
   // la app muestra una pantalla bloqueante con botón a la tienda.
   bool _forceUpdateRequired = false;
   String? _forceUpdateStoreUrl;
+  // Metas del usuario (normales + diarias).
+  List<UserGoal> _goals = [];
   // Config del asistente IA (cacheada por sesión, editable desde el admin).
   final Map<String, String> _aiConfig = {};
   List<Map<String, dynamic>> _aiKnowledge = [];
@@ -105,6 +108,9 @@ class AppProvider extends ChangeNotifier {
   bool get isAuthenticated => _isAuthenticated;
   bool get forceUpdateRequired => _forceUpdateRequired;
   String? get forceUpdateStoreUrl => _forceUpdateStoreUrl;
+  List<UserGoal> get goals => _goals;
+  List<UserGoal> get regularGoals => _goals.where((g) => !g.isDaily).toList();
+  List<UserGoal> get dailyGoals => _goals.where((g) => g.isDaily).toList();
   Checkin? get todayCheckin => _todayCheckin;
   String get dailyPhrase => _dailyPhrase;
   bool get hasCompletedOnboarding => _profile?.onboardingCompleted ?? false;
@@ -558,6 +564,7 @@ class AppProvider extends ChangeNotifier {
       _loadRoutines(),
       _loadFinancialData(),
       loadBlockedUsers(),
+      loadGoals(),
     ]);
 
     _findTodayCheckin();
@@ -768,6 +775,93 @@ class AppProvider extends ChangeNotifier {
     _clearData();
     notifyListeners();
   }
+
+  // ============ METAS ============
+  Future<void> loadGoals() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final data = await _supabase
+          .from('user_goals')
+          .select()
+          .eq('user_id', userId)
+          .order('is_completed')
+          .order('created_at', ascending: false);
+      _goals = (data as List).map((e) => UserGoal.fromJson(e)).toList();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading goals: $e');
+    }
+  }
+
+  Future<void> addGoal(String title,
+      {bool isDaily = false, String source = 'manual'}) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null || title.trim().isEmpty) return;
+    try {
+      final data = await _supabase.from('user_goals').insert({
+        'user_id': userId,
+        'title': title.trim(),
+        'is_daily': isDaily,
+        'source': source,
+      }).select().single();
+      _goals.insert(0, UserGoal.fromJson(data));
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error adding goal: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> toggleGoal(UserGoal g) async {
+    final newVal = !g.isCompleted;
+    try {
+      await _supabase.from('user_goals').update({
+        'is_completed': newVal,
+        'completed_at': newVal ? DateTime.now().toIso8601String() : null,
+      }).eq('id', g.id);
+      final idx = _goals.indexWhere((x) => x.id == g.id);
+      if (idx != -1) {
+        _goals[idx] = UserGoal(
+          id: g.id,
+          title: g.title,
+          isDaily: g.isDaily,
+          isCompleted: newVal,
+          completedAt: newVal ? DateTime.now() : null,
+          source: g.source,
+          createdAt: g.createdAt,
+        );
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error toggling goal: $e');
+    }
+  }
+
+  Future<void> deleteGoal(String id) async {
+    try {
+      await _supabase.from('user_goals').delete().eq('id', id);
+      _goals.removeWhere((g) => g.id == id);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error deleting goal: $e');
+    }
+  }
+
+  /// Extrae sugerencias de meta `[META: ...]` de un mensaje del asistente.
+  static final RegExp _metaRe =
+      RegExp(r'\[META:\s*(.+?)\s*\]', caseSensitive: false);
+  static List<String> parseGoalSuggestions(String content) => _metaRe
+      .allMatches(content)
+      .map((m) => m.group(1)!.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+
+  /// Quita los marcadores `[META: ...]` del texto visible.
+  static String stripGoalMarkers(String content) => content
+      .replaceAll(_metaRe, '')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
 
   // ============ PASSWORD RESET (código de 6 dígitos por email) ============
 

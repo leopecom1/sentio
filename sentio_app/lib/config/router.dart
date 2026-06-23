@@ -19,6 +19,7 @@ import 'package:sentio_app/screens/profile/profile_screen.dart';
 import 'package:sentio_app/screens/crisis/crisis_screen.dart';
 import 'package:sentio_app/screens/routines/routine_screen.dart';
 import 'package:sentio_app/screens/progress/progress_screen.dart';
+import 'package:sentio_app/screens/goals/goals_screen.dart';
 import 'package:sentio_app/screens/insights/insights_screen.dart';
 import 'package:sentio_app/screens/community/community_feed_screen.dart';
 import 'package:sentio_app/screens/community/post_detail_screen.dart';
@@ -162,6 +163,12 @@ GoRouter createRouter(AppProvider appProvider) {
         path: '/checkin',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const CheckinScreen(),
+      ),
+      // Metas - full screen
+      GoRoute(
+        path: '/goals',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const GoalsScreen(),
       ),
       // Insights - full screen
       GoRoute(

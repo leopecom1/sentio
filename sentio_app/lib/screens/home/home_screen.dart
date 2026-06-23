@@ -179,6 +179,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     opacity: _restFade,
                     child: Column(
                       children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: _buildGoalsCard(context, provider),
+                        ),
+                        const SizedBox(height: 20),
                         if (provider.checkins.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -730,6 +735,101 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ══════════════════════════════════════
   // QUICK ACTIONS (with scale + stagger)
   // ══════════════════════════════════════
+
+  Widget _buildGoalsCard(BuildContext context, AppProvider provider) {
+    final goals = provider.goals;
+    final done = goals.where((g) => g.isCompleted).length;
+    final pending = goals.where((g) => !g.isCompleted).take(3).toList();
+    return GestureDetector(
+      onTap: () => context.push('/goals'),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: SentioColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: SentioColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: SentioColors.accent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.flag_rounded,
+                      color: SentioColors.accent, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Tus metas',
+                          style: GoogleFonts.manrope(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: SentioColors.textPrimary)),
+                      Text(
+                          goals.isEmpty
+                              ? 'Organizá lo que querés lograr'
+                              : '$done de ${goals.length} completadas',
+                          style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              color: SentioColors.textSecondary)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded,
+                    color: SentioColors.textTertiary),
+              ],
+            ),
+            if (pending.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              ...pending.map((g) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => provider.toggleGoal(g),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: SentioColors.textTertiary, width: 2),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(g.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.manrope(
+                                    fontSize: 14,
+                                    color: SentioColors.textPrimary)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )),
+            ] else if (goals.isEmpty) ...[
+              const SizedBox(height: 12),
+              Text('Creá una meta o pedile ideas al asistente del chat 💬',
+                  style: GoogleFonts.manrope(
+                      fontSize: 13, color: SentioColors.textTertiary)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildQuickActions(BuildContext context) {
     final actions = [
