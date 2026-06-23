@@ -634,6 +634,14 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// Recarga la lista de conversaciones (para el panel de historial).
+  Future<void> reloadConversations() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    await _loadConversations(userId);
+    notifyListeners();
+  }
+
   Future<void> _loadDailyPhrase() async {
     try {
       final data = await _supabase
@@ -1013,6 +1021,22 @@ class AppProvider extends ChangeNotifier {
       _currentMessages.add(ChatMessage.fromJson(userMsgData));
       notifyListeners();
 
+      // Si es el primer mensaje del usuario, titulamos la conversación con él
+      // (así el historial es legible). Solo una vez por conversación.
+      final userMsgCount =
+          _currentMessages.where((m) => m.role == 'user').length;
+      if (userMsgCount == 1 && _currentConversationId != null) {
+        final trimmed = content.trim();
+        final title =
+            trimmed.length > 48 ? '${trimmed.substring(0, 48)}…' : trimmed;
+        try {
+          await _supabase
+              .from('chat_conversations')
+              .update({'title': title}).eq('id', _currentConversationId!);
+          await _loadConversations(userId);
+        } catch (_) {/* no crítico */}
+      }
+
       // Generate AI response via OpenAI
       final responseContent = await _getOpenAIResponse(content);
 
@@ -1124,9 +1148,9 @@ class AppProvider extends ChangeNotifier {
         {'role': 'system', 'content': systemContent.toString()},
       ];
 
-      // Historial reciente (últimos 10 mensajes).
-      final recentMessages = _currentMessages.length > 10
-          ? _currentMessages.sublist(_currentMessages.length - 10)
+      // Historial reciente (últimos 20 mensajes) para mantener contexto.
+      final recentMessages = _currentMessages.length > 20
+          ? _currentMessages.sublist(_currentMessages.length - 20)
           : _currentMessages;
       for (final msg in recentMessages) {
         messages.add({

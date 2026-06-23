@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sentio_app/config/theme.dart';
-import 'package:sentio_app/config/constants.dart';
 import 'package:sentio_app/providers/app_provider.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -27,10 +26,150 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<AppProvider>();
       if (provider.currentMessages.isEmpty) {
-        provider.startNewConversation();
+        // Retomamos la última conversación si existe; si no, arrancamos una nueva.
+        if (provider.conversations.isNotEmpty) {
+          provider.loadConversationMessages(provider.conversations.first.id);
+        } else {
+          provider.startNewConversation();
+        }
       }
       _ensureConsent();
     });
+  }
+
+  /// Panel con el historial de conversaciones para retomar o empezar otra.
+  void _showHistory(BuildContext context, AppProvider provider) {
+    provider.reloadConversations();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: SentioColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Consumer<AppProvider>(
+        builder: (ctx, p, _) {
+          final convs = p.conversations;
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.history_rounded,
+                          color: SentioColors.textSecondary, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Tus conversaciones',
+                          style: GoogleFonts.manrope(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: SentioColors.textPrimary)),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          provider.startNewConversation();
+                        },
+                        child: const Text('Nueva',
+                            style: TextStyle(color: SentioColors.primary)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  if (convs.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 28),
+                      child: Text('Todavía no tenés conversaciones.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: SentioColors.textTertiary)),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: convs.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final c = convs[i];
+                          final isCurrent = c.id == p.currentConversationId;
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              provider.loadConversationMessages(c.id);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: isCurrent
+                                    ? SentioColors.primary.withValues(alpha: 0.10)
+                                    : SentioColors.card,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                    color: isCurrent
+                                        ? SentioColors.primary
+                                        : SentioColors.border),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                      c.isCrisis
+                                          ? Icons.favorite_rounded
+                                          : Icons.chat_bubble_outline_rounded,
+                                      size: 18,
+                                      color: c.isCrisis
+                                          ? SentioColors.error
+                                          : SentioColors.primary),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                            (c.title?.isNotEmpty ?? false)
+                                                ? c.title!
+                                                : 'Conversación',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.manrope(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color:
+                                                    SentioColors.textPrimary)),
+                                        const SizedBox(height: 2),
+                                        Text(_formatDate(c.updatedAt),
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color:
+                                                    SentioColors.textTertiary)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _formatDate(DateTime d) {
+    final diff = DateTime.now().difference(d);
+    if (diff.inDays == 0) return 'Hoy';
+    if (diff.inDays == 1) return 'Ayer';
+    if (diff.inDays < 7) return 'Hace ${diff.inDays} días';
+    return '${d.day}/${d.month}/${d.year}';
   }
 
   /// Shows a one-time consent dialog before the user can use the AI chat.
@@ -162,37 +301,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
-  /// Returns an emoji for today's checkin emotion, or a default.
-  String _getMoodEmoji(String? emotionId) {
-    if (emotionId == null) return '---';
-    final match = SentioConstants.emotions.where((e) => e['id'] == emotionId);
-    if (match.isNotEmpty) return match.first['emoji'] as String;
-    return '---';
-  }
-
-  /// Returns the label for today's checkin emotion.
-  String _getMoodLabel(String? emotionId) {
-    if (emotionId == null) return 'Sin registro';
-    final match = SentioConstants.emotions.where((e) => e['id'] == emotionId);
-    if (match.isNotEmpty) return match.first['label'] as String;
-    return emotionId;
-  }
-
-  /// Returns the first goal label from the user's profile goals list.
-  String _getGoalText(List<String> goals) {
-    if (goals.isEmpty) return 'Sin meta';
-    final goalId = goals.first;
-    final match = SentioConstants.goals.where((g) => g['id'] == goalId);
-    if (match.isNotEmpty) return match.first['label'] ?? goalId;
-    return goalId;
-  }
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final messages = provider.currentMessages;
-    final todayCheckin = provider.todayCheckin;
-    final profile = provider.profile;
 
     return Scaffold(
       backgroundColor: SentioColors.background,
@@ -245,29 +357,30 @@ class _ChatScreenState extends State<ChatScreen> {
                 _buildHeader(provider),
                 // ─── AI disclaimer banner ───
                 _buildDisclaimerBanner(),
-                // ─── Focus Area Cards ───
-                _buildFocusCards(todayCheckin?.primaryEmotion, profile?.goals ?? []),
-                // ─── Divider ───
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Divider(height: 1, color: SentioColors.border),
-                ),
-                // ─── Messages ───
+                const SizedBox(height: 4),
+                // ─── Messages (tap para ocultar el teclado) ───
                 Expanded(
-                  child: messages.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                          itemCount: messages.length + (_isSending ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == messages.length && _isSending) {
-                              return _buildTypingIndicator();
-                            }
-                            final message = messages[index];
-                            return _buildMessage(message.content, message.isUser);
-                          },
-                        ),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => FocusScope.of(context).unfocus(),
+                    child: messages.isEmpty
+                        ? _buildEmptyState()
+                        : ListView.builder(
+                            controller: _scrollController,
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                            itemCount: messages.length + (_isSending ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index == messages.length && _isSending) {
+                                return _buildTypingIndicator();
+                              }
+                              final message = messages[index];
+                              return _buildMessage(
+                                  message.content, message.isUser);
+                            },
+                          ),
+                  ),
                 ),
                 // ─── Quick Suggestions ───
                 if (messages.length <= 1) _buildQuickActions(),
@@ -352,12 +465,16 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: SentioColors.textSecondary,
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      'Respuestas generadas por IA',
-                      style: GoogleFonts.manrope(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: SentioColors.textSecondary,
+                    Flexible(
+                      child: Text(
+                        'Respuestas generadas por IA',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.manrope(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: SentioColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -365,6 +482,25 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
+          // History button
+          GestureDetector(
+            onTap: () => _showHistory(context, provider),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: SentioColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: SentioColors.border),
+              ),
+              child: const Icon(
+                Icons.history_rounded,
+                color: SentioColors.textSecondary,
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           // New conversation button
           GestureDetector(
             onTap: () => provider.startNewConversation(),
@@ -426,55 +562,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════
-  //  FOCUS AREA CARDS
-  // ═══════════════════════════════════════════
-  Widget _buildFocusCards(String? emotionId, List<String> goals) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-      child: Row(
-        children: [
-          // Estado card
-          Expanded(
-            child: _FocusCard(
-              icon: Text(
-                _getMoodEmoji(emotionId),
-                style: const TextStyle(fontSize: 18),
-              ),
-              label: 'Estado',
-              value: _getMoodLabel(emotionId),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Meta card
-          Expanded(
-            child: _FocusCard(
-              icon: const Icon(
-                Icons.flag_rounded,
-                color: SentioColors.primary,
-                size: 18,
-              ),
-              label: 'Meta',
-              value: _getGoalText(goals),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Ingresos card
-          Expanded(
-            child: _FocusCard(
-              icon: Icon(
-                Icons.trending_up_rounded,
-                color: SentioColors.accent,
-                size: 18,
-              ),
-              label: 'Ingresos',
-              value: '+15%',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // ═══════════════════════════════════════════
   //  EMPTY STATE
@@ -750,62 +837,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════
-//  FOCUS CARD WIDGET
-// ═══════════════════════════════════════════════
-class _FocusCard extends StatelessWidget {
-  final Widget icon;
-  final String label;
-  final String value;
-
-  const _FocusCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: SentioColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: SentioColors.primary.withOpacity(0.20),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          icon,
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: GoogleFonts.manrope(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: SentioColors.textSecondary,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: GoogleFonts.manrope(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: SentioColors.textPrimary,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
       ),
     );
   }
