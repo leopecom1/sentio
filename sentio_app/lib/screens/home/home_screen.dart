@@ -821,7 +821,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   )),
             ] else if (goals.isEmpty) ...[
               const SizedBox(height: 12),
-              Text('Creá una meta o pedile ideas al asistente del chat 💬',
+              Text('Creá una meta o pedile ideas al asistente del chat',
                   style: GoogleFonts.manrope(
                       fontSize: 13, color: SentioColors.textTertiary)),
             ],

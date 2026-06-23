@@ -793,10 +793,10 @@ class _ChatScreenState extends State<ChatScreen> {
   // ═══════════════════════════════════════════
   Widget _buildQuickActions() {
     final suggestions = [
-      {'emoji': '\u{1F630}', 'text': 'Tengo ansiedad'},
-      {'emoji': '\u{1F9F1}', 'text': 'Estoy bloqueado'},
-      {'emoji': '\u{1F4C9}', 'text': 'No estoy vendiendo'},
-      {'emoji': '\u{1F4A1}', 'text': 'Necesito claridad'},
+      {'icon': Icons.sentiment_very_dissatisfied_rounded, 'text': 'Tengo ansiedad'},
+      {'icon': Icons.block_rounded, 'text': 'Estoy bloqueado'},
+      {'icon': Icons.trending_down_rounded, 'text': 'No estoy vendiendo'},
+      {'icon': Icons.lightbulb_outline_rounded, 'text': 'Necesito claridad'},
     ];
 
     return SizedBox(
@@ -810,7 +810,7 @@ class _ChatScreenState extends State<ChatScreen> {
           final s = suggestions[index];
           return GestureDetector(
             onTap: () {
-              _controller.text = '${s['emoji']} ${s['text']}';
+              _controller.text = s['text'] as String;
               _send();
             },
             child: Container(
@@ -822,13 +822,21 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: SentioColors.primary.withOpacity(0.20),
                 ),
               ),
-              child: Text(
-                '${s['emoji']} ${s['text']}',
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: SentioColors.textPrimary,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(s['icon'] as IconData,
+                      size: 15, color: SentioColors.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    s['text'] as String,
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: SentioColors.textPrimary,
+                    ),
+                  ),
+                ],
               ),
             ),
           );

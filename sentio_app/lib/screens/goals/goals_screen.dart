@@ -15,6 +15,14 @@ class GoalsScreen extends StatefulWidget {
 }
 
 class _GoalsScreenState extends State<GoalsScreen> {
+  static const _freqs = [
+    {'key': 'none', 'label': 'Una vez', 'icon': Icons.check_circle_outline_rounded},
+    {'key': 'daily', 'label': 'Diaria', 'icon': Icons.wb_sunny_outlined},
+    {'key': 'weekly', 'label': 'Semanal', 'icon': Icons.view_week_outlined},
+    {'key': 'monthly', 'label': 'Mensual', 'icon': Icons.calendar_month_outlined},
+    {'key': 'custom', 'label': 'Cada X días', 'icon': Icons.repeat_rounded},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -23,9 +31,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
     });
   }
 
-  void _addGoal(bool isDaily) {
+  void _addGoal({String initialFreq = 'none'}) {
     HapticFeedback.lightImpact();
     final controller = TextEditingController();
+    final intervalController = TextEditingController(text: '3');
+    String freq = initialFreq;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -33,55 +44,128 @@ class _GoalsScreenState extends State<GoalsScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              isDaily ? 'Nueva meta diaria' : 'Nueva meta',
-              style: GoogleFonts.manrope(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: SentioColors.textPrimary),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
-              style: GoogleFonts.manrope(color: SentioColors.textPrimary),
-              decoration: InputDecoration(
-                hintText: isDaily
-                    ? 'Ej. Meditar 5 minutos'
-                    : 'Ej. Ordenar mi espacio de trabajo',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Nueva meta',
+                  style: GoogleFonts.manrope(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: SentioColors.textPrimary)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                style: GoogleFonts.manrope(color: SentioColors.textPrimary),
+                decoration: const InputDecoration(
+                    hintText: 'Ej. Ordenar mi espacio de trabajo'),
               ),
-              onSubmitted: (v) {
-                if (v.trim().isNotEmpty) {
-                  context.read<AppProvider>().addGoal(v, isDaily: isDaily);
-                  Navigator.pop(ctx);
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                if (controller.text.trim().isNotEmpty) {
+              const SizedBox(height: 18),
+              Text('Frecuencia',
+                  style: GoogleFonts.manrope(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: SentioColors.textSecondary)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _freqs.map((f) {
+                  final selected = freq == f['key'];
+                  return GestureDetector(
+                    onTap: () => setSheet(() => freq = f['key'] as String),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? SentioColors.primary
+                            : SentioColors.card,
+                        borderRadius: BorderRadius.circular(100),
+                        border: Border.all(
+                            color: selected
+                                ? SentioColors.primary
+                                : SentioColors.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(f['icon'] as IconData,
+                              size: 15,
+                              color: selected
+                                  ? Colors.white
+                                  : SentioColors.textSecondary),
+                          const SizedBox(width: 6),
+                          Text(f['label'] as String,
+                              style: GoogleFonts.manrope(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: selected
+                                      ? Colors.white
+                                      : SentioColors.textPrimary)),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              if (freq == 'custom') ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Text('Cada',
+                        style: GoogleFonts.manrope(
+                            color: SentioColors.textSecondary)),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 64,
+                      child: TextField(
+                        controller: intervalController,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
+                        style:
+                            GoogleFonts.manrope(color: SentioColors.textPrimary),
+                        decoration: const InputDecoration(hintText: '3'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text('días',
+                        style: GoogleFonts.manrope(
+                            color: SentioColors.textSecondary)),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  final t = controller.text.trim();
+                  if (t.isEmpty) return;
+                  final interval = freq == 'custom'
+                      ? (int.tryParse(intervalController.text) ?? 1)
+                          .clamp(1, 365)
+                      : null;
                   context
                       .read<AppProvider>()
-                      .addGoal(controller.text, isDaily: isDaily);
+                      .addGoal(t, recurrence: freq, intervalDays: interval);
                   Navigator.pop(ctx);
-                }
-              },
-              child: const Text('Agregar'),
-            ),
-          ],
+                },
+                child: const Text('Agregar'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -94,8 +178,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
       body: SafeArea(
         child: Consumer<AppProvider>(
           builder: (context, provider, _) {
-            final daily = provider.dailyGoals;
-            final regular = provider.regularGoals;
+            final recurring = provider.recurringGoals;
+            final oneTime = provider.oneTimeGoals;
             final allCount = provider.goals.length;
             final doneCount =
                 provider.goals.where((g) => g.isCompleted).length;
@@ -106,9 +190,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 SliverToBoxAdapter(child: _header(context)),
                 SliverToBoxAdapter(
                     child: _progressCard(doneCount, allCount, pct)),
-                _section('Hoy', Icons.wb_sunny_rounded, daily, true,
-                    'Sumá metas diarias para hoy.'),
-                _section('Mis metas', Icons.flag_rounded, regular, false,
+                _section('Recurrentes', Icons.repeat_rounded, recurring,
+                    'custom', 'Sumá metas que se repitan (diarias, semanales…).'),
+                _section('Mis metas', Icons.flag_rounded, oneTime, 'none',
                     'Todavía no tenés metas. Creá una o pedile ideas al asistente.'),
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
               ],
@@ -117,7 +201,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addGoal(false),
+        onPressed: () => _addGoal(),
         backgroundColor: SentioColors.primary,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
         label: Text('Nueva meta',
@@ -162,7 +246,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
     final msg = total == 0
         ? 'Empezá creando tu primera meta'
         : pct == 1
-            ? '¡Completaste todas! 🎉'
+            ? '¡Completaste todas!'
             : 'Vas $done de $total. Seguí así.';
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 12, 20, 8),
@@ -236,7 +320,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
   }
 
   Widget _section(String title, IconData icon, List<UserGoal> goals,
-      bool isDaily, String emptyMsg) {
+      String addFreq, String emptyMsg) {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -253,21 +337,21 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         fontWeight: FontWeight.w800,
                         color: SentioColors.textPrimary)),
                 const Spacer(),
-                if (isDaily)
-                  GestureDetector(
-                    onTap: () => _addGoal(true),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.add_rounded,
-                            size: 16, color: SentioColors.primary),
-                        Text('Agregar',
-                            style: GoogleFonts.manrope(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: SentioColors.primary)),
-                      ],
-                    ),
+                GestureDetector(
+                  onTap: () => _addGoal(
+                      initialFreq: addFreq == 'custom' ? 'daily' : 'none'),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.add_rounded,
+                          size: 16, color: SentioColors.primary),
+                      Text('Agregar',
+                          style: GoogleFonts.manrope(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: SentioColors.primary)),
+                    ],
                   ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -298,8 +382,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
           color: SentioColors.error.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Icon(Icons.delete_outline_rounded,
-            color: SentioColors.error),
+        child:
+            const Icon(Icons.delete_outline_rounded, color: SentioColors.error),
       ),
       onDismissed: (_) {
         HapticFeedback.mediumImpact();
@@ -347,18 +431,38 @@ class _GoalsScreenState extends State<GoalsScreen> {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  g.title,
-                  style: GoogleFonts.manrope(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: g.isCompleted
-                        ? SentioColors.textTertiary
-                        : SentioColors.textPrimary,
-                    decoration:
-                        g.isCompleted ? TextDecoration.lineThrough : null,
-                    decorationColor: SentioColors.textTertiary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      g.title,
+                      style: GoogleFonts.manrope(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: g.isCompleted
+                            ? SentioColors.textTertiary
+                            : SentioColors.textPrimary,
+                        decoration:
+                            g.isCompleted ? TextDecoration.lineThrough : null,
+                        decorationColor: SentioColors.textTertiary,
+                      ),
+                    ),
+                    if (g.isRecurring) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.repeat_rounded,
+                              size: 12, color: SentioColors.accent),
+                          const SizedBox(width: 4),
+                          Text(g.recurrenceLabel,
+                              style: GoogleFonts.manrope(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: SentioColors.accent)),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
               if (g.source == 'chat')

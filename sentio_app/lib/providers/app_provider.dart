@@ -109,8 +109,10 @@ class AppProvider extends ChangeNotifier {
   bool get forceUpdateRequired => _forceUpdateRequired;
   String? get forceUpdateStoreUrl => _forceUpdateStoreUrl;
   List<UserGoal> get goals => _goals;
-  List<UserGoal> get regularGoals => _goals.where((g) => !g.isDaily).toList();
-  List<UserGoal> get dailyGoals => _goals.where((g) => g.isDaily).toList();
+  List<UserGoal> get oneTimeGoals =>
+      _goals.where((g) => !g.isRecurring).toList();
+  List<UserGoal> get recurringGoals =>
+      _goals.where((g) => g.isRecurring).toList();
   Checkin? get todayCheckin => _todayCheckin;
   String get dailyPhrase => _dailyPhrase;
   bool get hasCompletedOnboarding => _profile?.onboardingCompleted ?? false;
@@ -795,14 +797,18 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> addGoal(String title,
-      {bool isDaily = false, String source = 'manual'}) async {
+      {String recurrence = 'none',
+      int? intervalDays,
+      String source = 'manual'}) async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null || title.trim().isEmpty) return;
     try {
       final data = await _supabase.from('user_goals').insert({
         'user_id': userId,
         'title': title.trim(),
-        'is_daily': isDaily,
+        'is_daily': recurrence == 'daily',
+        'recurrence': recurrence,
+        'interval_days': intervalDays,
         'source': source,
       }).select().single();
       _goals.insert(0, UserGoal.fromJson(data));
@@ -829,6 +835,8 @@ class AppProvider extends ChangeNotifier {
           isCompleted: newVal,
           completedAt: newVal ? DateTime.now() : null,
           source: g.source,
+          recurrence: g.recurrence,
+          intervalDays: g.intervalDays,
           createdAt: g.createdAt,
         );
       }

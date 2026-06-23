@@ -15,8 +15,15 @@ CREATE TABLE IF NOT EXISTS public.user_goals (
   is_completed boolean NOT NULL DEFAULT false,
   completed_at timestamptz,
   source       text NOT NULL DEFAULT 'manual',  -- 'manual' | 'chat'
+  -- Recurrencia (opción avanzada): 'none' | 'daily' | 'weekly' | 'monthly' | 'custom'
+  recurrence   text NOT NULL DEFAULT 'none',
+  interval_days int,                              -- para recurrence = 'custom' (cada N días)
   created_at   timestamptz NOT NULL DEFAULT now()
 );
+
+-- Para tablas ya creadas sin estas columnas:
+ALTER TABLE public.user_goals ADD COLUMN IF NOT EXISTS recurrence text NOT NULL DEFAULT 'none';
+ALTER TABLE public.user_goals ADD COLUMN IF NOT EXISTS interval_days int;
 
 CREATE INDEX IF NOT EXISTS idx_user_goals_user
   ON public.user_goals (user_id, is_daily, is_completed, created_at DESC);

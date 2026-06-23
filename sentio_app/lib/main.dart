@@ -60,11 +60,17 @@ class _SentioAppState extends State<SentioApp> {
         routerConfig: _router,
         builder: (context, child) {
           final provider = context.watch<AppProvider>();
-          return Stack(
-            children: [
-              child!,
-              CelebrationOverlayManager(provider: provider),
-            ],
+          // Fallback global de emoji: garantiza que los emojis (usados como
+          // íconos de emociones, chat, etc.) se rendericen en todos los
+          // dispositivos/renderers, no como cuadros vacíos.
+          return DefaultTextStyle.merge(
+            style: const TextStyle(fontFamilyFallback: ['NotoEmoji']),
+            child: Stack(
+              children: [
+                child!,
+                CelebrationOverlayManager(provider: provider),
+              ],
+            ),
           );
         },
       ),

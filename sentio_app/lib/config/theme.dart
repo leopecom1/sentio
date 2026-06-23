@@ -226,7 +226,7 @@ class SentioTheme {
     const color = SentioColors.textPrimary;
     const secondaryColor = SentioColors.textSecondary;
 
-    return TextTheme(
+    final base = TextTheme(
       displayLarge: GoogleFonts.manrope(
         fontSize: 32,
         fontWeight: FontWeight.w800,
@@ -308,6 +308,28 @@ class SentioTheme {
         fontWeight: FontWeight.w500,
         color: secondaryColor,
       ),
+    );
+
+    // Fallback de emoji en TODOS los estilos: garantiza que los emojis
+    // (usados como íconos en varias pantallas) se rendericen y no como cuadros.
+    TextStyle? e(TextStyle? s) =>
+        s?.copyWith(fontFamilyFallback: const ['NotoEmoji']);
+    return base.copyWith(
+      displayLarge: e(base.displayLarge),
+      displayMedium: e(base.displayMedium),
+      displaySmall: e(base.displaySmall),
+      headlineLarge: e(base.headlineLarge),
+      headlineMedium: e(base.headlineMedium),
+      headlineSmall: e(base.headlineSmall),
+      titleLarge: e(base.titleLarge),
+      titleMedium: e(base.titleMedium),
+      titleSmall: e(base.titleSmall),
+      bodyLarge: e(base.bodyLarge),
+      bodyMedium: e(base.bodyMedium),
+      bodySmall: e(base.bodySmall),
+      labelLarge: e(base.labelLarge),
+      labelMedium: e(base.labelMedium),
+      labelSmall: e(base.labelSmall),
     );
   }
 }

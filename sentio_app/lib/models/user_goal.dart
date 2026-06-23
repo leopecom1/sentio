@@ -5,6 +5,8 @@ class UserGoal {
   final bool isCompleted;
   final DateTime? completedAt;
   final String source;
+  final String recurrence; // 'none' | 'daily' | 'weekly' | 'monthly' | 'custom'
+  final int? intervalDays; // para recurrence == 'custom' (cada N días)
   final DateTime createdAt;
 
   UserGoal({
@@ -14,8 +16,28 @@ class UserGoal {
     required this.isCompleted,
     this.completedAt,
     this.source = 'manual',
+    this.recurrence = 'none',
+    this.intervalDays,
     required this.createdAt,
   });
+
+  bool get isRecurring => recurrence != 'none';
+
+  /// Etiqueta legible de la frecuencia.
+  String get recurrenceLabel {
+    switch (recurrence) {
+      case 'daily':
+        return 'Diaria';
+      case 'weekly':
+        return 'Semanal';
+      case 'monthly':
+        return 'Mensual';
+      case 'custom':
+        return intervalDays != null ? 'Cada $intervalDays días' : 'Personalizada';
+      default:
+        return 'Una vez';
+    }
+  }
 
   factory UserGoal.fromJson(Map<String, dynamic> j) => UserGoal(
         id: j['id'] as String,
@@ -26,7 +48,9 @@ class UserGoal {
             ? DateTime.tryParse(j['completed_at'] as String)
             : null,
         source: (j['source'] ?? 'manual') as String,
-        createdAt:
-            DateTime.tryParse((j['created_at'] ?? '') as String) ?? DateTime.now(),
+        recurrence: (j['recurrence'] ?? 'none') as String,
+        intervalDays: j['interval_days'] as int?,
+        createdAt: DateTime.tryParse((j['created_at'] ?? '') as String) ??
+            DateTime.now(),
       );
 }
