@@ -10,8 +10,13 @@ class SentioConstants {
     'SUPABASE_URL',
     defaultValue: 'https://b2better.api.kodevant.space',
   );
-  static const String supabaseAnonKey =
-      String.fromEnvironment('SUPABASE_ANON_KEY');
+  static const String supabaseAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    // anon key pública de b2better (protegida por RLS). Default para que la app
+    // no crashee si se compila sin --dart-define-from-file=env.json.
+    defaultValue:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzEzMTk2MDAwLCJleHAiOjIwMjg3MzA2MDB9.Fi1nuUn5TI9ZNY_CdZEDtDPmxWrsk653hfK82ss3AhQ',
+  );
 
   // OpenAI — la clave ya NO vive en la app. Las llamadas pasan por la función
   // `ai_proxy` en Supabase (la clave está en Vault, del lado del servidor).
