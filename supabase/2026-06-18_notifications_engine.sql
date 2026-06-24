@@ -101,7 +101,7 @@ BEGIN
   PERFORM extensions.http_set_curlopt('CURLOPT_TIMEOUT','15');
   PERFORM extensions.http((
     'POST','https://onesignal.com/api/v1/notifications',
-    ARRAY[extensions.http_header('Authorization','Basic '||v_key)],
+    ARRAY[extensions.http_header('Authorization','Key '||v_key)],  -- REST API key formato v2 (os_v2_app_...)
     'application/json',
     jsonb_build_object(
       'app_id', v_app,
