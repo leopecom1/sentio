@@ -21,12 +21,45 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   TimeOfDay _morningTime = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _eveningTime = const TimeOfDay(hour: 21, minute: 0);
 
+  // Preferencias por categoría (servidor): app / push / email
+  static const _categories = [
+    ('habitos', 'Hábitos', 'Recordatorios de check-in, racha, metas y diario', Icons.self_improvement_rounded),
+    ('comunidad', 'Comunidad', 'Cuando comentan o reaccionan a tus publicaciones', Icons.groups_rounded),
+    ('reactivacion', 'Reactivación', 'Si pasás unos días sin entrar', Icons.waving_hand_rounded),
+  ];
+  Map<String, Map<String, bool>> _prefs = {};
+  bool _loadingPrefs = true;
+
   @override
   void initState() {
     super.initState();
     final provider = context.read<AppProvider>();
     _morningEnabled = provider.profile?.morningReminder ?? true;
     _eveningEnabled = provider.profile?.eveningReminder ?? true;
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await context.read<AppProvider>().loadNotificationPreferences();
+    if (mounted) setState(() { _prefs = prefs; _loadingPrefs = false; });
+  }
+
+  bool _ch(String category, String channel) => _prefs[category]?[channel] ?? true;
+
+  Future<void> _setChannel(String category, String channel, bool value) async {
+    final current = {
+      'in_app': _ch(category, 'in_app'),
+      'push': _ch(category, 'push'),
+      'email': _ch(category, 'email'),
+    };
+    current[channel] = value;
+    setState(() => _prefs[category] = current);
+    await context.read<AppProvider>().setNotificationPreference(
+      category,
+      inApp: current['in_app']!,
+      push: current['push']!,
+      email: current['email']!,
+    );
   }
 
   Future<void> _pickTime(bool isMorning) async {
@@ -206,6 +239,36 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   ),
 
                   const SizedBox(height: 32),
+                  Text(
+                    'Tipos de notificación',
+                    style: GoogleFonts.manrope(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: SentioColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Elegí por dónde querés recibir cada tipo.',
+                    style: GoogleFonts.manrope(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: SentioColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_loadingPrefs)
+                    const Center(child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(color: SentioColors.accent, strokeWidth: 2),
+                    ))
+                  else
+                    ..._categories.map((c) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildCategoryCard(c.$1, c.$2, c.$3, c.$4),
+                    )),
+
+                  const SizedBox(height: 20),
                   // Info text
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -327,6 +390,88 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             activeColor: SentioColors.accent,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard(String category, String title, String subtitle, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: SentioColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SentioColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: SentioColors.accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: SentioColors.accent, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: GoogleFonts.manrope(
+                      fontSize: 15, fontWeight: FontWeight.w600, color: SentioColors.textPrimary)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: GoogleFonts.manrope(
+                      fontSize: 12, fontWeight: FontWeight.w500, color: SentioColors.textSecondary, height: 1.3)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _channelChip(category, 'in_app', 'App', Icons.notifications_rounded),
+              const SizedBox(width: 8),
+              _channelChip(category, 'push', 'Push', Icons.phone_iphone_rounded),
+              const SizedBox(width: 8),
+              _channelChip(category, 'email', 'Email', Icons.mail_outline_rounded),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _channelChip(String category, String channel, String label, IconData icon) {
+    final on = _ch(category, channel);
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _setChannel(category, channel, !on),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: on ? SentioColors.accent.withValues(alpha: 0.1) : SentioColors.background,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: on ? SentioColors.accent.withValues(alpha: 0.4) : SentioColors.border,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 18, color: on ? SentioColors.accent : SentioColors.textTertiary),
+              const SizedBox(height: 4),
+              Text(label, style: GoogleFonts.manrope(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: on ? SentioColors.accent : SentioColors.textTertiary,
+              )),
+            ],
+          ),
+        ),
       ),
     );
   }

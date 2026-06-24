@@ -8,6 +8,7 @@ import 'package:sentio_app/config/constants.dart';
 import 'package:sentio_app/config/router.dart';
 import 'package:sentio_app/providers/app_provider.dart';
 import 'package:sentio_app/services/notification_service.dart';
+import 'package:sentio_app/services/push_service.dart';
 import 'package:sentio_app/widgets/celebration_overlay_manager.dart';
 
 void main() async {
@@ -31,6 +32,9 @@ void main() async {
   await appProvider.initialize();
 
   await NotificationService.instance.initialize();
+
+  // Push (no-op hasta que haya onesignal_app_id en app_config)
+  await PushService.instance.initialize();
 
   runApp(SentioApp(appProvider: appProvider));
 }

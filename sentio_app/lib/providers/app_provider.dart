@@ -18,6 +18,7 @@ import 'package:sentio_app/services/notification_service.dart';
 import 'package:sentio_app/services/community_service.dart';
 import 'package:sentio_app/services/finance_service.dart';
 import 'package:sentio_app/services/notifications_service.dart';
+import 'package:sentio_app/services/push_service.dart';
 import 'package:sentio_app/services/gamification_service.dart';
 import 'package:sentio_app/models/financial_account.dart';
 import 'package:sentio_app/models/financial_transaction.dart';
@@ -206,6 +207,47 @@ class AppProvider extends ChangeNotifier {
     _notifications = _notifications.where((n) => n.id != id).toList();
     _unreadNotifications = _notifications.where((n) => !n.isRead).length;
     notifyListeners();
+  }
+
+  // ---- Preferencias de notificaciones (por categoría) ----
+  // categoría: 'all' (master) | habitos | comunidad | reactivacion | progreso
+  Future<Map<String, Map<String, bool>>> loadNotificationPreferences() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return {};
+    try {
+      final rows = await _supabase
+          .from('notification_preferences')
+          .select('category, in_app, push, email')
+          .eq('user_id', userId);
+      final out = <String, Map<String, bool>>{};
+      for (final r in (rows as List)) {
+        out[r['category'] as String] = {
+          'in_app': r['in_app'] as bool? ?? true,
+          'push': r['push'] as bool? ?? true,
+          'email': r['email'] as bool? ?? true,
+        };
+      }
+      return out;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> setNotificationPreference(
+    String category, {
+    required bool inApp,
+    required bool push,
+    required bool email,
+  }) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    await _supabase.from('notification_preferences').upsert({
+      'user_id': userId,
+      'category': category,
+      'in_app': inApp,
+      'push': push,
+      'email': email,
+    }, onConflict: 'user_id,category');
   }
 
   void _startNotificationsPolling() {
@@ -576,6 +618,8 @@ class AppProvider extends ChangeNotifier {
     // Load notifications and start polling
     await loadNotifications();
     _startNotificationsPolling();
+    // Vincular push al usuario (no-op si OneSignal no está configurado)
+    PushService.instance.login(userId);
     notifyListeners();
   }
 
@@ -773,6 +817,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    PushService.instance.logout();
     await _supabase.auth.signOut();
     _clearData();
     notifyListeners();
