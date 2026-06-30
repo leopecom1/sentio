@@ -59,6 +59,10 @@ class AppProvider extends ChangeNotifier {
   // la app muestra una pantalla bloqueante con botón a la tienda.
   bool _forceUpdateRequired = false;
   String? _forceUpdateStoreUrl;
+
+  // Si está en true, las cuentas nuevas necesitan aprobación del admin antes de
+  // entrar. Default false (registro abierto). Se controla desde app_config.
+  bool _requireAccountApproval = false;
   // Metas del usuario (normales + diarias).
   List<UserGoal> _goals = [];
   // Config del asistente IA (cacheada por sesión, editable desde el admin).
@@ -109,6 +113,7 @@ class AppProvider extends ChangeNotifier {
   bool get isAuthenticated => _isAuthenticated;
   bool get forceUpdateRequired => _forceUpdateRequired;
   String? get forceUpdateStoreUrl => _forceUpdateStoreUrl;
+  bool get requireAccountApproval => _requireAccountApproval;
   List<UserGoal> get goals => _goals;
   List<UserGoal> get oneTimeGoals =>
       _goals.where((g) => !g.isRecurring).toList();
@@ -534,13 +539,16 @@ class AppProvider extends ChangeNotifier {
       final rows = await _supabase
           .from('app_config')
           .select('key, value')
-          .inFilter('key', [minKey, urlKey]);
+          .inFilter('key', [minKey, urlKey, 'require_account_approval']);
 
       String? minVersion;
       String? storeUrl;
       for (final r in rows as List) {
         if (r['key'] == minKey) minVersion = r['value'] as String?;
         if (r['key'] == urlKey) storeUrl = r['value'] as String?;
+        if (r['key'] == 'require_account_approval') {
+          _requireAccountApproval = (r['value'] as String?)?.trim() == 'true';
+        }
       }
 
       if (minVersion != null &&

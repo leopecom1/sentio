@@ -82,7 +82,9 @@ GoRouter createRouter(AppProvider appProvider) {
         return '/auth';
       }
 
-      if (hasProfile && !isApproved) {
+      // Solo bloqueamos por aprobación si el admin lo exige (app_config).
+      // Por defecto el registro es abierto y el usuario entra directo.
+      if (appProvider.requireAccountApproval && hasProfile && !isApproved) {
         if (currentPath == '/pending-approval') return null;
         return '/pending-approval';
       }
