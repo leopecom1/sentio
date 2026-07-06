@@ -6,6 +6,8 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Firebase / google-services (para el token FCM de OneSignal en Android)
+    id("com.google.gms.google-services")
 }
 
 // Load signing config from android/key.properties (kept out of source control).

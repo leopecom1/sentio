@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "194707911214",
+    "project_id": "b2betternot",
+    "storage_bucket": "b2betternot.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:194707911214:android:c59975cf3d65e2218ae5bf",
+        "android_client_info": {
+          "package_name": "com.sentio.sentio_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8Zem_cE5_eIQiv85EqxXVLgKFTbjtM64"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
