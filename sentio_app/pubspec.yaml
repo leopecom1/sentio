@@ -1,7 +1,7 @@
 name: sentio_app
 description: "Sentio - Bienestar emocional para emprendedores"
 publish_to: 'none'
-version: 1.0.4+7
+version: 1.0.5+8
 
 environment:
   sdk: ^3.11.0

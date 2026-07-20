@@ -17,6 +17,7 @@ import 'package:sentio_app/screens/tools/burnout_test_screen.dart';
 import 'package:sentio_app/screens/content/article_screen.dart';
 import 'package:sentio_app/screens/profile/profile_screen.dart';
 import 'package:sentio_app/screens/crisis/crisis_screen.dart';
+import 'package:sentio_app/screens/support/contact_screen.dart';
 import 'package:sentio_app/screens/routines/routine_screen.dart';
 import 'package:sentio_app/screens/progress/progress_screen.dart';
 import 'package:sentio_app/screens/goals/goals_screen.dart';
@@ -131,6 +132,12 @@ GoRouter createRouter(AppProvider appProvider) {
         path: '/crisis',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const CrisisScreen(),
+      ),
+      // Ayuda / contacto
+      GoRoute(
+        path: '/contact',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ContactScreen(),
       ),
       // Journal entry screens - full screen
       GoRoute(

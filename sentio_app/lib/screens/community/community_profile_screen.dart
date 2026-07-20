@@ -124,10 +124,11 @@ class _CommunityProfileScreenState extends State<CommunityProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // Follow button
+            // Follow button — el estado viene del provider (fuente de verdad),
+            // así reacciona al toque y persiste entre sesiones.
             SizedBox(
               width: double.infinity,
-              child: user.isFollowedByMe
+              child: provider.isFollowingUser(widget.userId)
                   ? OutlinedButton(
                       onPressed: () => provider.toggleFollowUser(widget.userId),
                       child: const Text('Siguiendo'),

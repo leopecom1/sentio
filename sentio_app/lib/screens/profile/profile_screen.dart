@@ -346,8 +346,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 items: [
                   _MenuItemData(
                     icon: Icons.help_outline_rounded,
-                    label: 'Ayuda',
-                    onTap: () {},
+                    label: 'Ayuda y contacto',
+                    onTap: () => context.push('/contact'),
                   ),
                 ],
               ),

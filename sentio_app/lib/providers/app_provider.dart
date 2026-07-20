@@ -1017,7 +1017,8 @@ class AppProvider extends ChangeNotifier {
     if (userId == null) return;
 
     final isDeep = mentalClarity != null;
-    final isCrisis = stress == 5 && energy == 1;
+    // Umbral de alerta ampliado: estrés máximo, o estrés alto con energía muy baja.
+    final isCrisis = stress == 5 || (stress >= 4 && energy <= 2);
 
     try {
       final data = await _supabase.from('checkins').insert({
@@ -1373,6 +1374,27 @@ class AppProvider extends ChangeNotifier {
       });
     } catch (e) {
       debugPrint('Error saving test result: $e');
+    }
+  }
+
+  /// Historial de un tipo de test (más reciente primero), para mostrarle al
+  /// usuario su evolución (si mejoró o empeoró respecto a tomas anteriores).
+  Future<List<Map<String, dynamic>>> getTestHistory(String testType,
+      {int limit = 20}) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+    try {
+      final data = await _supabase
+          .from('test_results')
+          .select('id, severity, severity_score, scores, created_at')
+          .eq('user_id', userId)
+          .eq('test_type', testType)
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return List<Map<String, dynamic>>.from(data as List);
+    } catch (e) {
+      debugPrint('Error loading test history: $e');
+      return [];
     }
   }
 
@@ -1808,9 +1830,24 @@ class AppProvider extends ChangeNotifier {
     await Future.wait([
       _loadCommunityPosts(),
       _loadCommunityStories(),
+      _loadFollowedUserIds(),
     ]);
     notifyListeners();
   }
+
+  /// Hidrata desde el servidor a quién sigue el usuario, para que el estado
+  /// "sigo/no sigo" sea correcto y persista entre sesiones.
+  Future<void> _loadFollowedUserIds() async {
+    try {
+      final ids = await _communityService.getFollowedUserIds();
+      _followedUserIds
+        ..clear()
+        ..addAll(ids);
+    } catch (_) {/* no crítico */}
+  }
+
+  /// ¿El usuario actual sigue a [userId]? (fuente de verdad para la UI)
+  bool isFollowingUser(String userId) => _followedUserIds.contains(userId);
 
   Future<void> _loadCommunityPosts({String? category}) async {
     try {
@@ -1871,30 +1908,39 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> toggleFollowUser(String userId) async {
-    // Optimistic update
+    final wasFollowed = _followedUserIds.contains(userId);
+
+    // Optimistic update — SIEMPRE actualiza el set (esté o no cacheado el user)
+    if (wasFollowed) {
+      _followedUserIds.remove(userId);
+    } else {
+      _followedUserIds.add(userId);
+    }
     final index = _communityUsers.indexWhere((u) => u.id == userId);
     if (index != -1) {
       final user = _communityUsers[index];
-      final wasFollowed = _followedUserIds.contains(userId);
+      _communityUsers[index] = user.copyWith(
+        isFollowedByMe: !wasFollowed,
+        followersCount:
+            (user.followersCount + (wasFollowed ? -1 : 1)).clamp(0, 1 << 30),
+      );
+    }
+    notifyListeners();
 
-      if (wasFollowed) {
-        _followedUserIds.remove(userId);
-        _communityUsers[index] = user.copyWith(
-          isFollowedByMe: false,
-          followersCount: user.followersCount - 1,
-        );
-      } else {
+    // Server call — reconciliar con el estado real que devuelve el backend
+    final nowFollowing = await _communityService.toggleFollow(userId);
+    if (nowFollowing != !wasFollowed) {
+      if (nowFollowing) {
         _followedUserIds.add(userId);
-        _communityUsers[index] = user.copyWith(
-          isFollowedByMe: true,
-          followersCount: user.followersCount + 1,
-        );
+      } else {
+        _followedUserIds.remove(userId);
+      }
+      if (index != -1) {
+        _communityUsers[index] =
+            _communityUsers[index].copyWith(isFollowedByMe: nowFollowing);
       }
       notifyListeners();
     }
-
-    // Server call
-    await _communityService.toggleFollow(userId);
   }
 
   Future<List<CommunityComment>> getCommentsForPost(String postId) async {

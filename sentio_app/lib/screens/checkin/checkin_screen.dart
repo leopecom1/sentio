@@ -175,6 +175,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
                 _MiniStat(label: 'Estrés', value: '$_stress/5'),
               ],
             ),
+            // Recursos de apoyo si el día viene difícil (#3a)
+            if (_stress >= 4) ...[
+              const SizedBox(height: 20),
+              _buildSupportCard(ctx),
+            ],
             const SizedBox(height: 24),
             SentioGradientButton(
               label: 'Listo',
@@ -201,6 +206,73 @@ class _CheckinScreenState extends State<CheckinScreen> {
       return 'Qué bueno sentir esa energía.\nAprovechá este momento.';
     }
     return 'Gracias por registrar cómo te sentís.\nCada check-in es un acto de cuidado.';
+  }
+
+  // Tarjeta de recursos de apoyo cuando el estrés viene alto (#3a).
+  Widget _buildSupportCard(BuildContext sheetCtx) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: SentioColors.accent.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SentioColors.accent.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.favorite_rounded, size: 18, color: SentioColors.accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Parece un día cargado',
+                    style: GoogleFonts.manrope(
+                        fontSize: 14, fontWeight: FontWeight.w700, color: SentioColors.textPrimary)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('No tenés que atravesarlo solo. Estas opciones pueden ayudarte ahora:',
+              style: GoogleFonts.manrope(
+                  fontSize: 13, height: 1.4, color: SentioColors.textSecondary)),
+          const SizedBox(height: 12),
+          _supportAction(sheetCtx, Icons.spa_rounded, 'Ver recursos de apoyo', '/crisis'),
+          const SizedBox(height: 8),
+          _supportAction(sheetCtx, Icons.chat_bubble_rounded, 'Hablar con el asistente', '/chat'),
+        ],
+      ),
+    );
+  }
+
+  Widget _supportAction(BuildContext sheetCtx, IconData icon, String label, String route) {
+    return InkWell(
+      onTap: () {
+        Navigator.of(sheetCtx).pop();
+        context.push(route);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: SentioColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: SentioColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: SentioColors.accent),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(label,
+                  style: GoogleFonts.manrope(
+                      fontSize: 14, fontWeight: FontWeight.w600, color: SentioColors.textPrimary)),
+            ),
+            const Icon(Icons.chevron_right_rounded, size: 18, color: SentioColors.textTertiary),
+          ],
+        ),
+      ),
+    );
   }
 
   @override

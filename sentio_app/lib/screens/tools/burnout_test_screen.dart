@@ -18,6 +18,7 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
   bool _started = false;
   bool _completed = false;
   int _currentQuestion = 0;
+  List<Map<String, dynamic>> _history = [];
   final Map<int, int> _answers = {}; // question index -> score 0-6
 
   late AnimationController _bgController;
@@ -134,7 +135,10 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
     setState(() => _completed = true);
     _entryController.reset();
     _entryController.forward();
+    _persistResults();
+  }
 
+  Future<void> _persistResults() async {
     final provider = context.read<AppProvider>();
 
     // Save tool usage (XP, stats)
@@ -145,9 +149,9 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
       completed: true,
     );
 
-    // Save test result for admin tracking
-    final severityLabels = ['none', 'low', 'moderate', 'high'];
-    provider.saveTestResult(
+    // Save test result (tracking + historial)
+    const severityLabels = ['none', 'low', 'moderate', 'high'];
+    await provider.saveTestResult(
       testType: 'burnout',
       severity: severityLabels[_severity],
       severityScore: _severity,
@@ -157,6 +161,103 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
         'dimension': _questions[i]['dimension'],
         'answer_value': _answers[i],
       }),
+    );
+
+    // Cargar historial (incluye la toma recién guardada) para mostrar evolución.
+    final h = await provider.getTestHistory('burnout');
+    if (mounted) setState(() => _history = h);
+  }
+
+  // ── Historial ──
+  (String, Color) _histLabel(int score) {
+    if (score >= 3) return ('Riesgo alto', const Color(0xFFE53935));
+    if (score >= 1) return ('Riesgo medio', const Color(0xFFFF9800));
+    return ('Sin señales', const Color(0xFF4CAF50));
+  }
+
+  String _fmtDate(String iso) {
+    final d = DateTime.tryParse(iso)?.toLocal();
+    if (d == null) return '';
+    const m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return '${d.day} ${m[d.month - 1]} ${d.year}';
+  }
+
+  Widget _buildHistorySection() {
+    // El historial ya incluye la toma actual como primer elemento. Necesitamos
+    // al menos una toma anterior para que tenga sentido mostrar evolución.
+    if (_history.length < 2) return const SizedBox.shrink();
+    final prevScore = (_history[1]['severity_score'] as num?)?.toInt() ?? 0;
+    final curScore = _severity;
+
+    late String trend;
+    late Color trendColor;
+    late IconData trendIcon;
+    if (curScore < prevScore) {
+      trend = 'Mejoraste desde la última vez';
+      trendColor = const Color(0xFF4CAF50);
+      trendIcon = Icons.trending_down_rounded;
+    } else if (curScore > prevScore) {
+      trend = 'Subió respecto a la última vez';
+      trendColor = const Color(0xFFE53935);
+      trendIcon = Icons.trending_up_rounded;
+    } else {
+      trend = 'Igual que la última vez';
+      trendColor = const Color(0xFFFF9800);
+      trendIcon = Icons.trending_flat_rounded;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: trendColor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: trendColor.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Icon(trendIcon, size: 20, color: trendColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(trend,
+                    style: GoogleFonts.manrope(
+                        fontSize: 14, fontWeight: FontWeight.w700, color: trendColor)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text('Tus tomas anteriores',
+            style: GoogleFonts.manrope(
+                fontSize: 14, fontWeight: FontWeight.w700, color: SentioColors.textPrimary)),
+        const SizedBox(height: 10),
+        // Saltamos el índice 0 (la toma actual, ya mostrada arriba).
+        ..._history.skip(1).map((h) {
+          final score = (h['severity_score'] as num?)?.toInt() ?? 0;
+          final (label, c) = _histLabel(score);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Container(width: 9, height: 9,
+                    decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(_fmtDate(h['created_at'] as String? ?? ''),
+                      style: GoogleFonts.manrope(
+                          fontSize: 13, color: SentioColors.textSecondary)),
+                ),
+                Text(label,
+                    style: GoogleFonts.manrope(
+                        fontSize: 13, fontWeight: FontWeight.w700, color: c)),
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 24),
+      ],
     );
   }
 
@@ -854,6 +955,8 @@ class _BurnoutTestScreenState extends State<BurnoutTestScreen>
                           ),
                           const SizedBox(height: 24),
                         ],
+                        // Historial / evolución respecto a tomas anteriores (#6)
+                        _buildHistorySection(),
                         _SpringTap(
                           onTap: () => context.pop(),
                           child: Container(
