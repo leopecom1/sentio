@@ -76,5 +76,7 @@
 		<string>B2Better accede a tus fotos para que puedas elegir una foto de perfil o una imagen de recibo desde tu galería.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
 		<string>B2Better puede guardar imágenes en tu galería.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>B2Better usa el micrófono para que puedas grabar notas de voz en tu diario.</string>
 	</dict>
 </plist>

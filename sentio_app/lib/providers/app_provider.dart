@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, File;
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sentio_app/models/profile.dart';
@@ -1107,6 +1108,56 @@ class AppProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error saving journal entry: $e');
       return false;
+    }
+  }
+
+  /// Sube una nota de voz al bucket PRIVADO y crea la entrada de diario (tipo voz).
+  Future<bool> saveVoiceNote({
+    required String localFilePath,
+    required int durationSeconds,
+    String? emotion,
+  }) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return false;
+    try {
+      final ext = localFilePath.contains('.') ? localFilePath.split('.').last : 'm4a';
+      final path = '$userId/${const Uuid().v4()}.$ext';
+      await _supabase.storage.from('voice-notes').upload(
+            path,
+            File(localFilePath),
+            fileOptions: const FileOptions(upsert: false),
+          );
+      final data = await _supabase.from('journal_entries').insert({
+        'user_id': userId,
+        'content': '',
+        'dominant_emotion': emotion,
+        'tags': [],
+        'word_count': 0,
+        'note_type': 'voice',
+        'audio_path': path,
+        'duration_seconds': durationSeconds,
+      }).select().single();
+
+      _journalEntries.insert(0, JournalEntry.fromJson(data));
+      await _loadProfile(userId);
+      _addXp(XpRewards.journalEntry);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error saving voice note: $e');
+      return false;
+    }
+  }
+
+  /// URL firmada (temporal, 1h) para reproducir una nota de voz privada.
+  Future<String?> getVoiceNoteSignedUrl(String audioPath) async {
+    try {
+      return await _supabase.storage
+          .from('voice-notes')
+          .createSignedUrl(audioPath, 3600);
+    } catch (e) {
+      debugPrint('Error signing voice url: $e');
+      return null;
     }
   }
 

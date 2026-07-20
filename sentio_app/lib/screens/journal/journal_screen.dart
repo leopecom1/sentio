@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:sentio_app/config/theme.dart';
 import 'package:sentio_app/config/constants.dart';
+import 'package:sentio_app/models/journal_entry.dart';
 import 'package:sentio_app/providers/app_provider.dart';
 
 class JournalScreen extends StatelessWidget {
@@ -52,7 +54,7 @@ class JournalScreen extends StatelessWidget {
                     ],
                   ),
                   GestureDetector(
-                    onTap: () => context.push('/journal/new'),
+                    onTap: () => _showNoteTypeSheet(context),
                     child: Container(
                       width: 48,
                       height: 48,
@@ -105,7 +107,9 @@ class JournalScreen extends StatelessWidget {
                             : null;
 
                         return GestureDetector(
-                          onTap: () => context.push('/journal/${entry.id}'),
+                          onTap: entry.isVoice
+                              ? null
+                              : () => context.push('/journal/${entry.id}'),
                           child: Container(
                             padding: const EdgeInsets.all(18),
                             decoration: BoxDecoration(
@@ -165,7 +169,9 @@ class JournalScreen extends StatelessWidget {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            '${DateFormat('HH:mm').format(entry.createdAt)} · ${entry.wordCount} palabras',
+                                            entry.isVoice
+                                                ? '${DateFormat('HH:mm').format(entry.createdAt)} · Nota de voz'
+                                                : '${DateFormat('HH:mm').format(entry.createdAt)} · ${entry.wordCount} palabras',
                                             style: GoogleFonts.manrope(
                                               fontSize: 12,
                                               color: SentioColors.textTertiary,
@@ -175,25 +181,29 @@ class JournalScreen extends StatelessWidget {
                                       ),
                                     ),
                                     Icon(
-                                      Icons.chevron_right_rounded,
+                                      entry.isVoice
+                                          ? Icons.mic_rounded
+                                          : Icons.chevron_right_rounded,
                                       color: SentioColors.textTertiary,
                                       size: 20,
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 14),
-                                // Content preview
-                                Text(
-                                  entry.content,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 14,
-                                    height: 1.6,
-                                    color: SentioColors.textSecondary,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
+                                // Content preview (texto) o reproductor (voz)
+                                entry.isVoice
+                                    ? _VoiceEntryPlayer(entry: entry)
+                                    : Text(
+                                        entry.content,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.manrope(
+                                          fontSize: 14,
+                                          height: 1.6,
+                                          color: SentioColors.textSecondary,
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      ),
                                 // Tags
                                 if (entry.tags.isNotEmpty) ...[
                                   const SizedBox(height: 12),
@@ -322,6 +332,198 @@ class JournalScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Hoja de elección al crear una nota: texto o voz.
+void _showNoteTypeSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: SentioColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Nueva nota',
+                style: GoogleFonts.manrope(
+                    fontSize: 18, fontWeight: FontWeight.w800, color: SentioColors.textPrimary)),
+            const SizedBox(height: 16),
+            _NoteTypeOption(
+              icon: Icons.edit_rounded,
+              title: 'Nota de texto',
+              subtitle: 'Escribí lo que sentís',
+              onTap: () {
+                Navigator.of(ctx).pop();
+                context.push('/journal/new');
+              },
+            ),
+            const SizedBox(height: 12),
+            _NoteTypeOption(
+              icon: Icons.mic_rounded,
+              title: 'Nota de voz',
+              subtitle: 'Grabá y escuchá con tu voz',
+              onTap: () {
+                Navigator.of(ctx).pop();
+                context.push('/journal/voice');
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _NoteTypeOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _NoteTypeOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: SentioColors.background,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: SentioColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: SentioColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: SentioColors.primary, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: GoogleFonts.manrope(
+                          fontSize: 15, fontWeight: FontWeight.w700, color: SentioColors.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: GoogleFonts.manrope(fontSize: 13, color: SentioColors.textSecondary)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: SentioColors.textTertiary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Reproductor inline para una nota de voz del diario.
+class _VoiceEntryPlayer extends StatefulWidget {
+  final JournalEntry entry;
+  const _VoiceEntryPlayer({required this.entry});
+
+  @override
+  State<_VoiceEntryPlayer> createState() => _VoiceEntryPlayerState();
+}
+
+class _VoiceEntryPlayerState extends State<_VoiceEntryPlayer> {
+  final _player = AudioPlayer();
+  bool _playing = false;
+  bool _loading = false;
+  String? _url;
+
+  @override
+  void initState() {
+    super.initState();
+    _player.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _playing = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_playing) {
+      await _player.pause();
+      setState(() => _playing = false);
+      return;
+    }
+    if (_url == null) {
+      setState(() => _loading = true);
+      _url = await context
+          .read<AppProvider>()
+          .getVoiceNoteSignedUrl(widget.entry.audioPath ?? '');
+      setState(() => _loading = false);
+      if (_url == null) return;
+    }
+    await _player.play(UrlSource(_url!));
+    setState(() => _playing = true);
+  }
+
+  String _fmt(int? s) {
+    final v = s ?? 0;
+    return '${(v ~/ 60).toString().padLeft(2, '0')}:${(v % 60).toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: SentioColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: _toggle,
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: SentioColors.primary,
+              ),
+              child: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(11),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      color: Colors.white, size: 24),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Icon(Icons.graphic_eq_rounded, color: SentioColors.primary.withValues(alpha: 0.6), size: 22),
+          const Spacer(),
+          Text(_fmt(widget.entry.durationSeconds),
+              style: GoogleFonts.manrope(
+                  fontSize: 13, fontWeight: FontWeight.w600, color: SentioColors.textSecondary)),
+        ],
       ),
     );
   }

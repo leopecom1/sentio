@@ -10,6 +10,7 @@ import 'package:sentio_app/screens/home/home_screen.dart';
 import 'package:sentio_app/screens/checkin/checkin_screen.dart';
 import 'package:sentio_app/screens/journal/journal_screen.dart';
 import 'package:sentio_app/screens/journal/journal_entry_screen.dart';
+import 'package:sentio_app/screens/journal/voice_note_screen.dart';
 import 'package:sentio_app/screens/chat/chat_screen.dart';
 import 'package:sentio_app/screens/tools/tools_screen.dart';
 import 'package:sentio_app/screens/tools/tool_detail_screen.dart';
@@ -144,6 +145,11 @@ GoRouter createRouter(AppProvider appProvider) {
         path: '/journal/new',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const JournalEntryScreen(),
+      ),
+      GoRoute(
+        path: '/journal/voice',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const VoiceNoteScreen(),
       ),
       GoRoute(
         path: '/journal/:id',
