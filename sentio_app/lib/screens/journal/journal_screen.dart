@@ -341,6 +341,7 @@ class JournalScreen extends StatelessWidget {
 void _showNoteTypeSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
+    useRootNavigator: true, // por encima de la barra de navegación del shell
     backgroundColor: SentioColors.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),

@@ -158,13 +158,16 @@ class _VoiceNoteScreenState extends State<VoiceNoteScreen> {
                 fontSize: 18, fontWeight: FontWeight.w700, color: SentioColors.textPrimary)),
       ),
       body: SafeArea(
-        child: Padding(
+        child: Container(
+          width: double.infinity, // el Column ocupa todo el ancho → se centra de verdad
           padding: const EdgeInsets.all(24),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Spacer(),
               // Contador
               Text(_fmt(_elapsed),
+                  textAlign: TextAlign.center,
                   style: GoogleFonts.manrope(
                       fontSize: 56, fontWeight: FontWeight.w800, color: SentioColors.textPrimary)),
               const SizedBox(height: 4),
@@ -174,6 +177,7 @@ class _VoiceNoteScreenState extends State<VoiceNoteScreen> {
                       : _phase == _Phase.recorded
                           ? 'Escuchá tu nota antes de guardar'
                           : 'Tocá para grabar (máx ${_fmt(_maxSeconds)})',
+                  textAlign: TextAlign.center,
                   style: GoogleFonts.manrope(fontSize: 14, color: SentioColors.textSecondary)),
               const Spacer(),
 
