@@ -15,6 +15,8 @@ class GoalsScreen extends StatefulWidget {
 }
 
 class _GoalsScreenState extends State<GoalsScreen> {
+  bool _showCompleted = false; // sección de metas únicas cumplidas (plegada)
+
   static const _freqs = [
     {'key': 'none', 'label': 'Una vez', 'icon': Icons.check_circle_outline_rounded},
     {'key': 'daily', 'label': 'Diaria', 'icon': Icons.wb_sunny_outlined},
@@ -180,6 +182,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
           builder: (context, provider, _) {
             final recurring = provider.recurringGoals;
             final oneTime = provider.oneTimeGoals;
+            final oneTimePending =
+                oneTime.where((g) => !g.isCompleted).toList();
+            final oneTimeDone =
+                oneTime.where((g) => g.isCompleted).toList();
             final allCount = provider.goals.length;
             final doneCount =
                 provider.goals.where((g) => g.isCompleted).length;
@@ -192,8 +198,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     child: _progressCard(doneCount, allCount, pct)),
                 _section('Recurrentes', Icons.repeat_rounded, recurring,
                     'custom', 'Sumá metas que se repitan (diarias, semanales…).'),
-                _section('Mis metas', Icons.flag_rounded, oneTime, 'none',
+                _section('Mis metas', Icons.flag_rounded, oneTimePending,
+                    'none',
                     'Todavía no tenés metas. Creá una o pedile ideas al asistente.'),
+                if (oneTimeDone.isNotEmpty) _completedSection(oneTimeDone),
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
               ],
             );
@@ -315,6 +323,46 @@ class _GoalsScreenState extends State<GoalsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Metas únicas ya cumplidas: plegadas para que no ocupen lugar.
+  Widget _completedSection(List<UserGoal> done) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _showCompleted = !_showCompleted),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded,
+                      size: 18, color: SentioColors.accent),
+                  const SizedBox(width: 8),
+                  Text('Completadas (${done.length})',
+                      style: GoogleFonts.manrope(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: SentioColors.textSecondary)),
+                  const Spacer(),
+                  Icon(
+                      _showCompleted
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: SentioColors.textTertiary),
+                ],
+              ),
+            ),
+            if (_showCompleted) ...[
+              const SizedBox(height: 10),
+              ...done.map((g) => _goalTile(g)),
+            ],
+          ],
+        ),
       ),
     );
   }
